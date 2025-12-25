@@ -38,11 +38,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
     fairwaysHit: '', // FIR (上球道)
     totalGir: '',    // GIR (标ON)
     totalOb: 0,
-    // 新增四个字段
+    // 新增五个字段
     doubleBogeys: 0,  // 爆洞
     pars: 0,          // Par洞
     birdies: 0,       // 鸟洞
     bogeys: 0,        // 鸡洞
+    eagles: 0,        // 老鹰洞
     notes: ''
   });
 
@@ -53,12 +54,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
   const [weatherError, setWeatherError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // --- 核心：详细模式自动计算逻辑 (实时更新 FIR、GIR 和四个新增字段) ---
+  // --- 核心：详细模式自动计算逻辑 (实时更新 FIR、GIR 和五个新增字段) ---
   useEffect(() => {
     if (inputMode === 'detailed') {
       let f9 = 0, b9 = 0, tScore = 0, tPutts = 0, tOb = 0, tGir = 0, tFairway = 0, t3Putts = 0;
-      // 新增四个字段的计数器
-      let doubleBogeysCount = 0, parsCount = 0, birdiesCount = 0, bogeysCount = 0;
+      // 新增五个字段的计数器
+      let doubleBogeysCount = 0, parsCount = 0, birdiesCount = 0, bogeysCount = 0, eaglesCount = 0;
       
       holesData.forEach(h => {
         const s = parseInt(h.strokes) || 0;
@@ -88,19 +89,20 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         // 累计 FIR (上球道)
         if (h.fairway) tFairway++;
 
-        // 计算新增四个字段（与标准杆比较）
+        // 计算新增五个字段（与标准杆比较）
         if (s > 0) {
           const diff = s - par;
           if (diff >= 2) {
-            doubleBogeysCount++; // 爆洞：大于等于标准杆2杆
+            doubleBogeysCount++; // 爆洞：大于等于2倍标准杆
           } else if (diff === 1) {
             bogeysCount++; // 鸡洞：大于标准杆1杆
           } else if (diff === 0) {
             parsCount++; // Par洞：标准杆
           } else if (diff === -1) {
             birdiesCount++; // 鸟洞：小于标准杆1杆
+          } else if (diff <= -2) {
+            eaglesCount++; // 老鹰洞：小于等于标准杆2杆
           }
-          // 注意：暂时不考虑老鹰洞（-2）及其他情况
         }
       });
 
@@ -115,11 +117,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         totalOb: tOb || '',
         totalGir: tGir || '',       // 实时更新标ON数
         fairwaysHit: tFairway || '', // 实时更新上球道数
-        // 更新新增四个字段
+        // 更新新增五个字段
         doubleBogeys: doubleBogeysCount || 0,
         bogeys: bogeysCount || 0,
         pars: parsCount || 0,
-        birdies: birdiesCount || 0
+        birdies: birdiesCount || 0,
+        eagles: eaglesCount || 0
       }));
     }
   }, [holesData, inputMode]);
@@ -230,8 +233,42 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       return;
     }
 
-    // ✅ 修改点1：确保爆洞字段名前后一致
-    // 数据清洗，防止空值报错
+    // ✅ 修复点：在提交前实时计算统计值，确保使用最新数据
+    const calculateFinalStats = () => {
+      if (inputMode === 'detailed' && holesData.length > 0) {
+        let doubleBogeys = 0, bogeys = 0, pars = 0, birdies = 0, eagles = 0;
+        
+        holesData.forEach(h => {
+          const s = parseInt(h.strokes) || 0;
+          const par = h.par || 4;
+          
+          if (s > 0) {
+            const diff = s - par;
+            if (diff >= 2) doubleBogeys++;
+            else if (diff === 1) bogeys++;
+            else if (diff === 0) pars++;
+            else if (diff === -1) birdies++;
+            else if (diff <= -2) eagles++;
+          }
+        });
+        
+        return { doubleBogeys, bogeys, pars, birdies, eagles };
+      }
+      
+      // 整场模式使用formData中的值
+      return {
+        doubleBogeys: Number(formData.doubleBogeys) || 0,
+        bogeys: Number(formData.bogeys) || 0,
+        pars: Number(formData.pars) || 0,
+        birdies: Number(formData.birdies) || 0,
+        eagles: Number(formData.eagles) || 0
+      };
+    };
+
+    const finalStats = calculateFinalStats();
+    console.log('提交前的统计值:', finalStats); // 调试用
+
+    // ✅ 数据清洗，防止空值报错
     const payload = {
       email: finalEmail.trim().toLowerCase(),
       ...formData,
@@ -243,11 +280,14 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       totalOb: Number(formData.totalOb) || 0,
       totalGir: Number(formData.totalGir) || 0,
       fairwaysHit: Number(formData.fairwaysHit) || 0,
-      // ✅ 确保这四个字段都被正确转换为数字并发送
-      doubleBogeys: Number(formData.doubleBogeys) || 0,  // 爆洞
-      pars: Number(formData.pars) || 0,                  // Par洞
-      birdies: Number(formData.birdies) || 0,            // 鸟洞
-      bogeys: Number(formData.bogeys) || 0,              // 鸡洞
+      
+      // ✅ 使用实时计算的统计值，确保数据准确
+      doubleBogeys: finalStats.doubleBogeys,  // 爆洞
+      bogeys: finalStats.bogeys,              // 鸡洞
+      pars: finalStats.pars,                  // Par洞
+      birdies: finalStats.birdies,            // 鸟洞
+      eagles: finalStats.eagles,              // 老鹰洞
+      
       weather: (weather && weather.condition) ? weather : null,
       holes: inputMode === 'detailed' ? holesData.map(h => ({
         ...h,
@@ -256,6 +296,8 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         ob: Number(h.ob) || 0
       })) : []
     };
+
+    console.log('最终提交的数据:', payload); // 调试用
 
     try {
       const response = await fetch(API_URL, {
@@ -270,9 +312,22 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         if (onScoreAdded) onScoreAdded(responseData);
         
         setFormData(prev => ({
-            ...prev, courseName: '', totalScore: '', frontNine: '', backNine: '',
-            totalPutts: '', totalOb: 0, totalGir: '', threePutts: '', fairwaysHit: '', 
-            doubleBogeys: 0, pars: 0, birdies: 0, bogeys: 0, notes: ''
+            ...prev, 
+            courseName: '', 
+            totalScore: '', 
+            frontNine: '', 
+            backNine: '',
+            totalPutts: '', 
+            totalOb: 0, 
+            totalGir: '', 
+            threePutts: '', 
+            fairwaysHit: '', 
+            doubleBogeys: 0, 
+            pars: 0, 
+            birdies: 0, 
+            bogeys: 0, 
+            eagles: 0,
+            notes: ''
         }));
         setHolesData(initialHoles);
         setIsExpanded(false);
@@ -533,8 +588,8 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
              </div>
           </div>
 
-          {/* 新增的四个字段：爆洞、鸡洞、Par洞、鸟洞 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {/* 新增的五个字段：爆洞、鸡洞、Par洞、鸟洞、老鹰洞 */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
              {/* 1. 爆洞 (doubleBogeys) */}
              <div className="col-span-1">
                 <label className={labelClass} title="大于等于标准杆2杆">爆洞</label>
@@ -584,6 +639,19 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
                   onChange={handleChange} 
                   readOnly={inputMode === 'detailed'} 
                   className={`${inputClass} text-blue-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 5. 老鹰洞 (eagles) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="小于等于标准杆2杆">老鹰洞</label>
+                <input 
+                  type="number" 
+                  name="eagles" 
+                  value={formData.eagles} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} text-purple-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
                 />
              </div>
           </div>
