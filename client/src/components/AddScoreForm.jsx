@@ -38,6 +38,11 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
     fairwaysHit: '', // FIR (上球道)
     totalGir: '',    // GIR (标On)
     totalOb: 0,
+    // 新增的四个字段
+    doubleBogeys: '',  // 爆洞 (≥+2)
+    bogeys: '',        // 鸡洞 (+1)
+    pars: '',          // Par洞 (=0)
+    birdies: '',       // 鸟洞 (-1)
     notes: ''
   });
 
@@ -48,15 +53,17 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
   const [weatherError, setWeatherError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // --- 核心：详细模式自动计算逻辑 (实时更新 FIR 和 GIR) ---
+  // --- 核心：详细模式自动计算逻辑 (实时更新 FIR、GIR 和四个新字段) ---
   useEffect(() => {
     if (inputMode === 'detailed') {
       let f9 = 0, b9 = 0, tScore = 0, tPutts = 0, tOb = 0, tGir = 0, tFairway = 0, t3Putts = 0;
+      let doubleBogeys = 0, pars = 0, birdies = 0, bogeys = 0; // 新增
       
       holesData.forEach(h => {
         const s = parseInt(h.strokes) || 0;
         const p = parseInt(h.putts) || 0;
         const obVal = parseInt(h.ob) || 0;
+        const par = parseInt(h.par) || 4;
 
         // 计算杆数
         if (s > 0) {
@@ -68,7 +75,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         // 计算推杆 & 3推
         if (p > 0) {
           tPutts += p;
-          if (p >= 3) t3Putts++; // 自动累计3推
+          if (p >= 3) t3Putts++;
         }
 
         // 累计 OB
@@ -79,6 +86,21 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
 
         // 累计 FIR (上球道)
         if (h.fairway) tFairway++;
+
+        // 计算爆洞、Par洞、鸟洞、鸡洞
+        if (s > 0) {
+          const diff = s - par;
+          if (diff >= 2) {
+            doubleBogeys++; // 爆洞：大于等于标准杆2杆
+          } else if (diff === 1) {
+            bogeys++; // 鸡洞：大于标准杆1杆
+          } else if (diff === 0) {
+            pars++; // Par洞：标准杆
+          } else if (diff === -1) {
+            birdies++; // 鸟洞：小于标准杆1杆
+          }
+          // 注意：暂时不考虑老鹰洞（-2）及其他情况
+        }
       });
 
       // 实时回填到总数据
@@ -90,8 +112,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         totalPutts: tPutts || '',
         threePutts: t3Putts || '',
         totalOb: tOb || '',
-        totalGir: tGir || '',       // 实时更新标On数
-        fairwaysHit: tFairway || '' // 实时更新上球道数
+        totalGir: tGir || '',
+        fairwaysHit: tFairway || '',
+        doubleBogeys: doubleBogeys || '', // 新增
+        pars: pars || '',                 // 新增
+        birdies: birdies || '',           // 新增
+        bogeys: bogeys || ''              // 新增
       }));
     }
   }, [holesData, inputMode]);
@@ -214,6 +240,10 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       totalOb: Number(formData.totalOb) || 0,
       totalGir: Number(formData.totalGir) || 0,
       fairwaysHit: Number(formData.fairwaysHit) || 0,
+      doubleBogeys: Number(formData.doubleBogeys) || 0, // 新增
+      pars: Number(formData.pars) || 0,                 // 新增
+      birdies: Number(formData.birdies) || 0,           // 新增
+      bogeys: Number(formData.bogeys) || 0,             // 新增
       weather: (weather && weather.condition) ? weather : null,
       holes: inputMode === 'detailed' ? holesData.map(h => ({
         ...h,
@@ -236,8 +266,21 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         if (onScoreAdded) onScoreAdded(responseData);
         
         setFormData(prev => ({
-            ...prev, courseName: '', totalScore: '', frontNine: '', backNine: '',
-            totalPutts: '', totalOb: 0, totalGir: '', threePutts: '', fairwaysHit: '', notes: ''
+            ...prev, 
+            courseName: '', 
+            totalScore: '', 
+            frontNine: '', 
+            backNine: '',
+            totalPutts: '', 
+            totalOb: 0, 
+            totalGir: '', 
+            threePutts: '', 
+            fairwaysHit: '', 
+            doubleBogeys: '',  // 新增
+            pars: '',          // 新增
+            birdies: '',       // 新增
+            bogeys: '',        // 新增
+            notes: ''
         }));
         setHolesData(initialHoles);
         setIsExpanded(false);
@@ -452,9 +495,9 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
             </div>
           )}
 
-          {/* 公共统计数据区：6列布局 (新增总杆显示) */}
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-             {/* 1. 总杆 (新增) */}
+          {/* 公共统计数据区：10个字段布局 */}
+          <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-2">
+             {/* 1. 总杆 */}
              <div className="col-span-1">
                 <label className={labelClass} title="总杆数">总杆</label>
                 <input 
@@ -495,6 +538,58 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
              <div className="col-span-1">
                 <label className={labelClass}>OB</label>
                 <input type="number" name="totalOb" value={formData.totalOb} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} text-red-500 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+
+             {/* 7. 爆洞 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="爆洞 (≥+2)">爆洞</label>
+                <input 
+                  type="number" 
+                  name="doubleBogeys" 
+                  value={formData.doubleBogeys} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'}
+                  className={`${inputClass} text-red-600 font-bold ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 8. 鸡洞 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="鸡洞 (+1)">鸡洞</label>
+                <input 
+                  type="number" 
+                  name="bogeys" 
+                  value={formData.bogeys} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'}
+                  className={`${inputClass} text-orange-500 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 9. Par洞 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="Par洞 (标准杆)">Par洞</label>
+                <input 
+                  type="number" 
+                  name="pars" 
+                  value={formData.pars} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'}
+                  className={`${inputClass} text-green-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 10. 鸟洞 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="鸟洞 (-1)">鸟洞</label>
+                <input 
+                  type="number" 
+                  name="birdies" 
+                  value={formData.birdies} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'}
+                  className={`${inputClass} text-blue-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
              </div>
           </div>
 

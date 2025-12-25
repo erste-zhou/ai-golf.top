@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import VoiceTextarea from './VoiceTextarea';
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, ComposedChart
 } from 'recharts';
 
 const StatsChart = ({ scores, onUpdate, onDelete }) => {
@@ -47,6 +47,10 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
     fairwaysHit: Number(item.fairwaysHit) || 0,
     threePutts: Number(item.threePutts) || 0,
     totalOb: Number(item.totalOb) || 0,
+    doubleBogeys: Number(item.doubleBogeys) || 0,
+    pars: Number(item.pars) || 0,
+    birdies: Number(item.birdies) || 0,
+    bogeys: Number(item.bogeys) || 0,
     dateShort: item.date ? item.date.substring(5) : '',
     courseName: item.courseName || '未知球场'
   }));
@@ -72,7 +76,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white/95 backdrop-blur-sm p-3 border border-gray-100 shadow-xl rounded-lg text-sm z-50">
+        <div className="bg-white/95 backdrop-blur-sm p-3 border border-gray-100 shadow-xl rounded-lg text-sm z-50 max-w-xs">
           <p className="font-bold mb-1 text-gray-800">{label}</p>
           <p className="text-xs text-gray-500 mb-2">{data.courseName}</p>
           {data.weather && (
@@ -88,7 +92,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
           <div className="border-t border-gray-100 pt-2 space-y-1">
             {payload.map((entry, index) => (
               <div key={index} className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill }}></span>
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill || entry.color }}></span>
                 <span className="font-medium text-gray-700">{entry.name}: {entry.value}</span>
               </div>
             ))}
@@ -209,7 +213,11 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
        totalGir: Number(editingScore.totalGir),
        totalOb: Number(editingScore.totalOb),
        fairwaysHit: Number(editingScore.fairwaysHit),
-       threePutts: Number(editingScore.threePutts)
+       threePutts: Number(editingScore.threePutts),
+       doubleBogeys: Number(editingScore.doubleBogeys || 0),
+       pars: Number(editingScore.pars || 0),
+       birdies: Number(editingScore.birdies || 0),
+       bogeys: Number(editingScore.bogeys || 0)
     };
 
     try {
@@ -240,48 +248,53 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
 
       {/* --- 图表展示区 --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 1. 总杆 */}
+        {/* 1. 总杆数/总推杆数 */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-emerald-500">
-            <span className="font-bold text-gray-700">🏆 总杆趋势</span>
+            <span className="font-bold text-gray-700">🏆 总杆数 & 总推杆数</span>
             <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">越低越好</span>
           </div>
           <div className="h-40 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                 <XAxis dataKey="dateShort" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
-                <YAxis domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
+                <YAxis yAxisId="left" domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
+                <YAxis yAxisId="right" orientation="right" domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="totalScore" stroke="#10b981" strokeWidth={3} dot={{r:3, fill:'#10b981'}} activeDot={{ r: 6 }} />
-              </LineChart>
+                <Line yAxisId="left" type="monotone" dataKey="totalScore" name="总杆数" stroke="#10b981" strokeWidth={3} dot={{r:3, fill:'#10b981'}} activeDot={{ r: 6 }} />
+                <Line yAxisId="right" type="monotone" dataKey="totalPutts" name="总推杆" stroke="#3b82f6" strokeWidth={2} dot={{r:3, fill:'#3b82f6'}} activeDot={{ r: 6 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* 2. 推杆 */}
+        {/* 2. 鸡洞/Par洞/鸟洞 */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-blue-500">
-             <span className="font-bold text-gray-700">⛳️ 推杆表现</span>
-             <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">目标 &lt; 36</span>
+          <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-purple-500">
+             <span className="font-bold text-gray-700">🐔 Par/Birdie/Bogey</span>
+             <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">追求小鸟和Par</span>
           </div>
           <div className="h-40 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                 <XAxis dataKey="dateShort" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
-                <YAxis domain={['auto', 'auto']} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
+                <YAxis allowDecimals={false} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
                 <Tooltip content={<CustomTooltip />} />
-                <Line type="step" dataKey="totalPutts" stroke="#3b82f6" strokeWidth={2} dot={{r:3, fill:'#3b82f6'}} activeDot={{ r: 6 }} />
-              </LineChart>
+                <Legend wrapperStyle={{fontSize: '10px'}} iconSize={8} />
+                <Bar name="鸡洞" dataKey="bogeys" fill="#f97316" radius={[2, 2, 0, 0]} />
+                <Bar name="Par洞" dataKey="pars" fill="#10b981" radius={[2, 2, 0, 0]} />
+                <Bar name="鸟洞" dataKey="birdies" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* 3. 击球质量 */}
+        {/* 3. FIR/GIR */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-purple-500">
-             <span className="font-bold text-gray-700">🎯 GIR & FIR</span>
+          <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-cyan-500">
+             <span className="font-bold text-gray-700">🎯 FIR & GIR</span>
              <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">越高越好</span>
           </div>
           <div className="h-40 w-full">
@@ -292,17 +305,17 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                 <YAxis allowDecimals={false} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{fontSize: '10px'}} iconSize={8} /> 
-                <Line name="GIR" type="monotone" dataKey="totalGir" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
-                <Line name="FIR" type="monotone" dataKey="fairwaysHit" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+                <Line name="FIR" type="monotone" dataKey="fairwaysHit" stroke="#06b6d4" strokeWidth={2} dot={{r:2}} activeDot={{ r: 5 }} />
+                <Line name="GIR" type="monotone" dataKey="totalGir" stroke="#8b5cf6" strokeWidth={2} dot={{r:2}} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* 4. OB */}
+        {/* 4. OB数/爆洞/3推洞 */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
            <div className="flex justify-between items-center mb-4 pl-2 border-l-4 border-red-500">
-             <span className="font-bold text-gray-700">⚠️ OB / 罚杆</span>
+             <span className="font-bold text-gray-700">⚠️ OB / 爆洞 / 3推</span>
              <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full">控制失误</span>
            </div>
           <div className="h-40 w-full">
@@ -310,15 +323,26 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorOb" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorDouble" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorThreePutts" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                 <XAxis dataKey="dateShort" tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} />
                 <YAxis allowDecimals={false} tick={{fontSize: 10, fill: '#9ca3af'}} axisLine={false} tickLine={false} width={25} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="totalOb" stroke="#ef4444" fillOpacity={1} fill="url(#colorOb)" strokeWidth={2} />
+                <Legend wrapperStyle={{fontSize: '10px'}} iconSize={8} />
+                <Area name="OB" type="monotone" dataKey="totalOb" stroke="#ef4444" fillOpacity={1} fill="url(#colorOb)" strokeWidth={2} />
+                <Area name="爆洞" type="monotone" dataKey="doubleBogeys" stroke="#f97316" fillOpacity={1} fill="url(#colorDouble)" strokeWidth={2} />
+                <Area name="3推洞" type="monotone" dataKey="threePutts" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorThreePutts)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -433,9 +457,10 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期 / 天气</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">球场</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">总杆</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">推杆 / 3推</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">FIR / GIR</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">推杆 / 三推</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">OB</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">OB / 爆洞</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">鸡/Par/鸟</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
@@ -472,15 +497,6 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
 
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                       <div className="flex justify-center items-center gap-1">
-                          <span className="font-medium text-cyan-600">{score.fairwaysHit || '-'}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className="font-medium text-purple-600">{score.totalGir}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-300 uppercase tracking-tighter">FIR / GIR</div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <div className="flex justify-center items-center gap-1">
                           <span className="font-medium text-blue-600">{score.totalPutts}</span>
                           <span className="text-gray-300">/</span>
                           <span className={`font-medium ${score.threePutts > 0 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
@@ -490,9 +506,43 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                       <div className="text-[10px] text-gray-300 uppercase tracking-tighter">Putts / 3-Putt</div>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {score.totalOb > 0 ? <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-xs font-bold">{score.totalOb}</span> : <span className="text-gray-300">-</span>}
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                      <div className="flex justify-center items-center gap-1">
+                          <span className="font-medium text-cyan-600">{score.fairwaysHit || '-'}</span>
+                          <span className="text-gray-300">/</span>
+                          <span className="font-medium text-purple-600">{score.totalGir}</span>
+                      </div>
+                      <div className="text-[10px] text-gray-300 uppercase tracking-tighter">FIR / GIR</div>
                     </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className={`font-medium ${score.totalOb > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                            {score.totalOb || 0}
+                          </span>
+                          <span className="text-gray-300">/</span>
+                          <span className={`font-medium ${score.doubleBogeys > 0 ? 'text-orange-600 font-bold' : 'text-gray-400'}`}>
+                            {score.doubleBogeys || 0}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-300 uppercase tracking-tighter">OB / 爆洞</div>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-orange-500">{score.bogeys || 0}</span>
+                          <span className="text-gray-300">/</span>
+                          <span className="font-medium text-green-600">{score.pars || 0}</span>
+                          <span className="text-gray-300">/</span>
+                          <span className="font-medium text-blue-600">{score.birdies || 0}</span>
+                        </div>
+                        <div className="text-[10px] text-gray-300 uppercase tracking-tighter">鸡/Par/鸟</div>
+                      </div>
+                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm relative">
                        <button onClick={() => setActiveDropdownId(activeDropdownId === score._id ? null : score._id)} className="text-gray-400 hover:text-emerald-600 font-bold px-2">⋮</button>
                        {activeDropdownId === score._id && (
@@ -506,7 +556,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                   {/* 电脑端备注 */}
                   {score.notes && (
                     <tr className="bg-gray-50/30">
-                        <td colSpan="7" className="px-6 py-2 text-xs text-gray-500 italic border-b border-gray-100">
+                        <td colSpan="8" className="px-6 py-2 text-xs text-gray-500 italic border-b border-gray-100">
                             <span className="mr-2">📝</span>{score.notes}
                         </td>
                     </tr>
@@ -560,8 +610,9 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                              <span className="text-4xl font-extrabold text-emerald-600">{score.totalScore}</span>
                              <span className="text-xs text-gray-400 font-medium">({score.frontNine}/{score.backNine})</span>
                          </div>
-                         <div className="flex gap-2 text-center">
-                             <div className="bg-blue-50 px-2 py-1 rounded-lg min-w-[3.5rem]">
+                         <div className="flex flex-col gap-1">
+                             {/* 推杆/3推 */}
+                             <div className="bg-blue-50 px-2 py-1 rounded-lg">
                                  <div className="text-[10px] text-blue-400 font-bold uppercase">Putts/3P</div>
                                  <div className="font-bold text-blue-700 flex justify-center gap-1">
                                     <span>{score.totalPutts}</span>
@@ -569,7 +620,9 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                                     <span className={`${score.threePutts > 0 ? 'text-red-500' : 'text-blue-400'}`}>{score.threePutts || 0}</span>
                                  </div>
                              </div>
-                             <div className="bg-purple-50 px-2 py-1 rounded-lg min-w-[3.5rem]">
+                             
+                             {/* FIR/GIR */}
+                             <div className="bg-purple-50 px-2 py-1 rounded-lg">
                                  <div className="text-[10px] text-purple-400 font-bold uppercase">FIR/GIR</div>
                                  <div className="font-bold text-purple-700 flex justify-center gap-1">
                                     <span>{score.fairwaysHit || '-'}</span>
@@ -577,13 +630,34 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                                     <span>{score.totalGir}</span>
                                  </div>
                              </div>
-                             {score.totalOb > 0 && (
-                                <div className="bg-red-50 px-2 py-1 rounded-lg min-w-[2.5rem]">
-                                    <div className="text-[10px] text-red-400 font-bold uppercase">OB</div>
-                                    <div className="font-bold text-red-700">{score.totalOb}</div>
-                                </div>
-                             )}
                          </div>
+                    </div>
+
+                    {/* 新增统计数据显示 */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        {/* OB/爆洞 */}
+                        <div className="bg-red-50 px-2 py-1 rounded-lg">
+                            <div className="text-[10px] text-red-400 font-bold uppercase">OB/爆洞</div>
+                            <div className="font-bold text-red-700 flex justify-center gap-1">
+                              <span>{score.totalOb || 0}</span>
+                              <span className="text-red-300">/</span>
+                              <span className={`${score.doubleBogeys > 0 ? 'text-orange-600' : 'text-red-400'}`}>
+                                {score.doubleBogeys || 0}
+                              </span>
+                            </div>
+                        </div>
+                        
+                        {/* 鸡/Par/鸟 */}
+                        <div className="bg-green-50 px-2 py-1 rounded-lg">
+                            <div className="text-[10px] text-green-400 font-bold uppercase">鸡/Par/鸟</div>
+                            <div className="font-bold flex justify-center gap-1">
+                              <span className="text-orange-500">{score.bogeys || 0}</span>
+                              <span className="text-gray-300">/</span>
+                              <span className="text-green-600">{score.pars || 0}</span>
+                              <span className="text-gray-300">/</span>
+                              <span className="text-blue-600">{score.birdies || 0}</span>
+                            </div>
+                        </div>
                     </div>
 
                     {score.notes && (
@@ -655,7 +729,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                          <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center" name="totalPutts" value={editingScore.totalPutts} onChange={handleEditChange} />
                      </div>
                      <div>
-                         <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">三推数</label>
+                         <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">三推洞</label>
                          <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center text-red-400" name="threePutts" value={editingScore.threePutts || 0} onChange={handleEditChange} />
                      </div>
                      <div>
@@ -665,15 +739,30 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                      
                      {/* 第二行 */}
                      <div>
-                         <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">GIR</label>
+                         <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">GIR (标On)</label>
                          <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center" name="totalGir" value={editingScore.totalGir} onChange={handleEditChange} />
                      </div>
                      <div>
                          <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">FIR (上球道)</label>
                          <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center" name="fairwaysHit" value={editingScore.fairwaysHit || 0} onChange={handleEditChange} />
                      </div>
-                     <div className="flex items-end justify-center pb-2 opacity-30">
-                        <span className="text-[10px]">⛳️</span>
+                     <div>
+                         <label className="text-xs font-bold text-orange-500 uppercase mb-1 block">爆洞</label>
+                         <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center text-orange-500" name="doubleBogeys" value={editingScore.doubleBogeys || 0} onChange={handleEditChange} />
+                     </div>
+                     
+                     {/* 第三行 */}
+                     <div>
+                         <label className="text-xs font-bold text-orange-400 uppercase mb-1 block">鸡洞</label>
+                         <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center text-orange-400" name="bogeys" value={editingScore.bogeys || 0} onChange={handleEditChange} />
+                     </div>
+                     <div>
+                         <label className="text-xs font-bold text-green-600 uppercase mb-1 block">Par洞</label>
+                         <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center text-green-600" name="pars" value={editingScore.pars || 0} onChange={handleEditChange} />
+                     </div>
+                     <div>
+                         <label className="text-xs font-bold text-blue-600 uppercase mb-1 block">鸟洞</label>
+                         <input type="number" className="w-full border border-gray-200 rounded-lg p-2 text-center text-blue-600" name="birdies" value={editingScore.birdies || 0} onChange={handleEditChange} />
                      </div>
                 </div>
 
