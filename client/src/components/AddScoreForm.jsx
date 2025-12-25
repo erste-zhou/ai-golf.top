@@ -1,902 +1,604 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { pinyin } from 'pinyin-pro';
 import VoiceTextarea from './VoiceTextarea';
 
-// 辅助函数：从每洞数据计算所有统计数据
-const calculateStatsFromHoles = (holes) => {
-  if (!holes || holes.length !== 18) {
-    return {
-      totalScore: 0,
-      totalPutts: 0,
-      threePutts: 0,
-      fairwaysHit: 0,
-      totalGir: 0,
-      totalOb: 0,
-      doubleBogeys: 0,
-      bogeys: 0,
-      pars: 0,
-      birdies: 0,
-      eagles: 0,
-      frontNine: 0,
-      backNine: 0
-    };
-  }
-  
-  let totalScore = 0;
-  let totalPutts = 0;
-  let threePutts = 0;
-  let fairwaysHit = 0;
-  let totalGir = 0;
-  let totalOb = 0;
-  let doubleBogeys = 0;
-  let bogeys = 0;
-  let pars = 0;
-  let birdies = 0;
-  let eagles = 0;
-  
-  // 计算总的FIR机会（只有4杆洞和5杆洞）
-  let firOpportunities = 0;
-  
-  holes.forEach((hole, index) => {
-    const { score = 0, putts = 0, par = 4, ob = 0, fairway = false, gir = false } = hole;
-    
-    // 累加基本数据
-    totalScore += Number(score) || 0;
-    totalPutts += Number(putts) || 0;
-    totalOb += Number(ob) || 0;
-    
-    // 计算3推洞
-    if (Number(putts) >= 3) threePutts++;
-    
-    // 计算FIR机会（只有4杆洞和5杆洞）
-    if (Number(par) >= 4) {
-      firOpportunities++;
-      if (fairway) {
-        fairwaysHit++;
-      }
-    }
-    
-    // 计算GIR
-    if (gir) {
-      totalGir++;
-    }
-    
-    // 计算成绩类型
-    const scoreDiff = (Number(score) || 0) - (Number(par) || 4);
-    
-    if (scoreDiff <= -2) {
-      eagles++;
-    } else if (scoreDiff === -1) {
-      birdies++;
-    } else if (scoreDiff === 0) {
-      pars++;
-    } else if (scoreDiff === 1) {
-      bogeys++;
-    } else if (scoreDiff >= 2) {
-      doubleBogeys++;
-    }
-  });
-  
-  // 计算前后九
-  const frontNine = holes.slice(0, 9).reduce((sum, hole) => sum + (Number(hole.score) || 0), 0);
-  const backNine = holes.slice(9).reduce((sum, hole) => sum + (Number(hole.score) || 0), 0);
-  
-  return {
-    totalScore,
-    totalPutts,
-    threePutts,
-    fairwaysHit,
-    totalGir,
-    totalOb,
-    doubleBogeys,
-    bogeys,
-    pars,
-    birdies,
-    eagles,
-    frontNine,
-    backNine
-  };
-};
+const API_URL = 'https://ai-golf-tracker.onrender.com/add-score';
 
-// 默认的18洞数据（带标准杆）
-const defaultHoles = [
-  // 前九洞（默认都是4杆洞）
-  { holeNumber: 1, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 2, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 3, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 4, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 5, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 6, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 7, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 8, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 9, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  // 后九洞（混合杆数）
-  { holeNumber: 10, par: 5, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 11, par: 5, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 12, par: 3, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 13, par: 5, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 14, par: 5, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 15, par: 3, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 16, par: 3, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 17, par: 3, score: '', putts: '', ob: 0, fairway: false, gir: false },
-  { holeNumber: 18, par: 4, score: '', putts: '', ob: 0, fairway: false, gir: false },
-];
+// 初始化的18洞数据结构
+const initialHoles = Array.from({ length: 18 }, (_, i) => ({
+  number: i + 1,
+  par: i < 9 ? 4 : 4,
+  strokes: '',        // 杆数
+  putts: '',          // 推杆
+  fairway: false,     // 上球道 (FIR)
+  gir: false,         // 标On (GIR)
+  ob: ''              // OB
+}));
 
-const AddScore = () => {
+const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
   const navigate = useNavigate();
-  const [inputMode, setInputMode] = useState('overall'); // 'overall' 或 'holes'
-  const [loading, setLoading] = useState(false);
-  const [activeHoleTab, setActiveHoleTab] = useState('frontNine'); // 'frontNine' 或 'backNine'
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 基础信息
+  // 模式切换: 'simple' (整场) | 'detailed' (18洞详情)
+  const [inputMode, setInputMode] = useState('simple'); 
+
+  // 详细模式下的 18 洞数据
+  const [holesData, setHolesData] = useState(initialHoles);
+
   const [formData, setFormData] = useState({
     courseName: '',
     date: new Date().toISOString().split('T')[0],
     tees: 'Blue',
-    notes: '',
-    weather: {
-      condition: '',
-      temp: '',
-      wind: ''
-    }
-  });
-  
-  // 整场数据模式的字段
-  const [overallData, setOverallData] = useState({
     frontNine: '',
     backNine: '',
     totalScore: '',
     totalPutts: '',
-    threePutts: '0',
-    totalGir: '',
-    fairwaysHit: '',
-    totalOb: '0',
-    doubleBogeys: '0',
-    bogeys: '0',
-    pars: '0',
-    birdies: '0'
+    threePutts: '', // 3推
+    fairwaysHit: '', // FIR (上球道)
+    totalGir: '',    // GIR (标On)
+    totalOb: 0,
+    // 新增四个字段
+    doubleBogeys: 0,  // 爆洞
+    pars: 0,          // Par洞
+    birdies: 0,       // 鸟洞
+    bogeys: 0,        // 鸡洞
+    notes: ''
   });
-  
-  // 18洞详情模式的数据
-  const [holesData, setHolesData] = useState([...defaultHoles]);
-  
-  // 计算出的统计数据（从holesData计算）
-  const [calculatedStats, setCalculatedStats] = useState(null);
-  
-  // 天气条件选项
-  const weatherConditions = [
-    '晴天', '多云', '阴天', '小雨', '大雨', '阵雨', '雷雨', '雾天', '雪天'
-  ];
 
-  // 当holesData变化时，实时计算统计数据
+  const [weather, setWeather] = useState({
+    temp: '', condition: '', wind: '', location: ''
+  });
+  const [loadingWeather, setLoadingWeather] = useState(false);
+  const [weatherError, setWeatherError] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  // --- 核心：详细模式自动计算逻辑 (实时更新 FIR、GIR 和四个新增字段) ---
   useEffect(() => {
-    if (inputMode === 'holes') {
-      const stats = calculateStatsFromHoles(holesData);
-      setCalculatedStats(stats);
+    if (inputMode === 'detailed') {
+      let f9 = 0, b9 = 0, tScore = 0, tPutts = 0, tOb = 0, tGir = 0, tFairway = 0, t3Putts = 0;
+      // 新增四个字段的计数器
+      let doubleBogeysCount = 0, parsCount = 0, birdiesCount = 0, bogeysCount = 0;
       
-      // 同时更新overallData用于显示
-      setOverallData(prev => ({
+      holesData.forEach(h => {
+        const s = parseInt(h.strokes) || 0;
+        const p = parseInt(h.putts) || 0;
+        const obVal = parseInt(h.ob) || 0;
+        const par = h.par || 4;
+
+        // 计算杆数
+        if (s > 0) {
+          if (h.number <= 9) f9 += s;
+          else b9 += s;
+          tScore += s;
+        }
+
+        // 计算推杆 & 3推
+        if (p > 0) {
+          tPutts += p;
+          if (p >= 3) t3Putts++; // 自动累计3推
+        }
+
+        // 累计 OB
+        tOb += obVal;
+
+        // 累计 GIR (标On)
+        if (h.gir) tGir++;
+
+        // 累计 FIR (上球道)
+        if (h.fairway) tFairway++;
+
+        // 计算新增四个字段（与标准杆比较）
+        if (s > 0) {
+          const diff = s - par;
+          if (diff >= 2) {
+            doubleBogeysCount++; // 爆洞：大于等于标准杆2杆
+          } else if (diff === 1) {
+            bogeysCount++; // 鸡洞：大于标准杆1杆
+          } else if (diff === 0) {
+            parsCount++; // Par洞：标准杆
+          } else if (diff === -1) {
+            birdiesCount++; // 鸟洞：小于标准杆1杆
+          }
+          // 注意：暂时不考虑老鹰洞（-2）及其他情况
+        }
+      });
+
+      // 实时回填到总数据
+      setFormData(prev => ({
         ...prev,
-        frontNine: stats.frontNine,
-        backNine: stats.backNine,
-        totalScore: stats.totalScore,
-        totalPutts: stats.totalPutts,
-        threePutts: stats.threePutts,
-        totalGir: stats.totalGir,
-        fairwaysHit: stats.fairwaysHit,
-        totalOb: stats.totalOb,
-        doubleBogeys: stats.doubleBogeys,
-        bogeys: stats.bogeys,
-        pars: stats.pars,
-        birdies: stats.birdies
+        frontNine: f9 || '',
+        backNine: b9 || '',
+        totalScore: tScore || '',
+        totalPutts: tPutts || '',
+        threePutts: t3Putts || '',
+        totalOb: tOb || '',
+        totalGir: tGir || '',       // 实时更新标On数
+        fairwaysHit: tFairway || '', // 实时更新上球道数
+        // 更新新增四个字段
+        doubleBogeys: doubleBogeysCount || 0,
+        bogeys: bogeysCount || 0,
+        pars: parsCount || 0,
+        birdies: birdiesCount || 0
       }));
     }
   }, [holesData, inputMode]);
 
-  // 处理基础信息变化
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // 处理天气变化
-  const handleWeatherChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      weather: {
-        ...prev.weather,
-        [field]: value
+  // --- 整场模式自动计算总分 ---
+  useEffect(() => {
+    if (inputMode === 'simple') {
+      const f9 = parseInt(formData.frontNine) || 0;
+      const b9 = parseInt(formData.backNine) || 0;
+      if (f9 > 0 || b9 > 0) {
+        setFormData(prev => ({ ...prev, totalScore: f9 + b9 }));
       }
-    }));
-  };
-
-  // 处理整场数据变化
-  const handleOverallChange = (e) => {
-    const { name, value } = e.target;
-    setOverallData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // 处理单洞数据变化
-  const handleHoleChange = (index, field, value) => {
-    const newHolesData = [...holesData];
-    
-    if (field === 'fairway' || field === 'gir') {
-      // 处理复选框
-      newHolesData[index][field] = !newHolesData[index][field];
-    } else {
-      // 处理数字输入
-      newHolesData[index][field] = value === '' ? '' : Number(value);
     }
-    
-    setHolesData(newHolesData);
+  }, [formData.frontNine, formData.backNine, inputMode]);
+
+  // 天气查询
+  useEffect(() => {
+    if (formData.courseName && formData.courseName.length >= 2) {
+      fetchWeather(formData.courseName, formData.date);
+    }
+  }, [formData.date]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 重置表单
-  const handleReset = () => {
-    setFormData({
-      courseName: '',
-      date: new Date().toISOString().split('T')[0],
-      tees: 'Blue',
-      notes: '',
-      weather: {
-        condition: '',
-        temp: '',
-        wind: ''
+  const handleHoleChange = (index, field, value) => {
+    const newHoles = [...holesData];
+    newHoles[index] = { ...newHoles[index], [field]: value };
+    setHolesData(newHoles);
+  };
+
+  const fetchWeather = async (inputName, selectedDate) => {
+    if (!inputName || typeof inputName !== 'string' || inputName.trim().length < 2) return;
+    const dateToQuery = selectedDate || formData.date;
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = dateToQuery === today;
+
+    setWeatherError(null);
+    setLoadingWeather(true);
+
+    try {
+      let rawCity = inputName;
+      const cityMatch = inputName.match(/([\u4e00-\u9fa5]{2,})(?:市|县|区)/);
+      if (cityMatch) rawCity = cityMatch[1];
+      else {
+        const chineseMatch = inputName.match(/[\u4e00-\u9fa5]{2,}/);
+        if (chineseMatch) rawCity = chineseMatch[0].substring(0, 2);
       }
-    });
-    
-    setOverallData({
-      frontNine: '',
-      backNine: '',
-      totalScore: '',
-      totalPutts: '',
-      threePutts: '0',
-      totalGir: '',
-      fairwaysHit: '',
-      totalOb: '0',
-      doubleBogeys: '0',
-      bogeys: '0',
-      pars: '0',
-      birdies: '0'
-    });
-    
-    setHolesData([...defaultHoles]);
-    setCalculatedStats(null);
+
+      let queryCity = rawCity;
+      if (/[\u4e00-\u9fa5]/.test(rawCity)) {
+        const pinyinResult = pinyin(rawCity, { toneType: 'none', separator: '' });
+        queryCity = pinyinResult.replace(/\s+/g, '');
+      }
+
+      const apiKey = import.meta.env.VITE_WEATHER_API_KEY || '933a528d7e1147ed97744718251712';
+      const url = isToday 
+        ? `https://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${encodeURIComponent(queryCity)}&lang=zh`
+        : `https://api.weatherapi.com/v1/history.json?key=${apiKey}&q=${encodeURIComponent(queryCity)}&dt=${dateToQuery}&lang=zh`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error?.message || '未找到该城市');
+
+      let weatherData = {};
+      if (isToday) {
+        weatherData = {
+          temp: `${data.current.temp_c}°C`,
+          condition: data.current.condition.text,
+          wind: `${data.current.wind_kph} km/h`,
+          location: data.location.name
+        };
+      } else {
+        const historyDay = data.forecast.forecastday[0].day;
+        weatherData = {
+          temp: `${historyDay.avgtemp_c}°C`,
+          condition: historyDay.condition.text,
+          wind: `${historyDay.maxwind_kph} km/h`,
+          location: data.location.name
+        };
+      }
+      setWeather(weatherData);
+    } catch (err) {
+      console.warn("天气获取失败:", err.message);
+      if (err.message.includes('history')) setWeatherError("API不支持历史查询");
+      else setWeatherError("未找到天气");
+      setWeather({ temp: '', condition: '', wind: '', location: '' });
+    } finally {
+      setLoadingWeather(false);
+    }
   };
 
-  // 提交表单
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // 验证必填字段
-    if (!formData.courseName.trim()) {
-      alert('请填写球场名称');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    let finalEmail = storedUser?.email || userEmail;
+
+    if (!finalEmail) {
+      alert("错误：未检测到登录用户，请重新登录！");
+      navigate('/login');
+      setIsSubmitting(false);
       return;
     }
-    
-    if (!formData.date) {
-      alert('请选择日期');
-      return;
-    }
-    
-    // 根据输入模式准备数据
-    let finalData = {
+
+    // 数据清洗，防止空值报错
+    const payload = {
+      email: finalEmail.trim().toLowerCase(),
       ...formData,
-      // 整场数据模式的字段
-      frontNine: Number(overallData.frontNine) || 0,
-      backNine: Number(overallData.backNine) || 0,
-      totalScore: Number(overallData.totalScore) || 0,
-      totalPutts: Number(overallData.totalPutts) || 0,
-      threePutts: Number(overallData.threePutts) || 0,
-      totalGir: Number(overallData.totalGir) || 0,
-      fairwaysHit: Number(overallData.fairwaysHit) || 0,
-      totalOb: Number(overallData.totalOb) || 0,
-      doubleBogeys: Number(overallData.doubleBogeys) || 0,
-      bogeys: Number(overallData.bogeys) || 0,
-      pars: Number(overallData.pars) || 0,
-      birdies: Number(overallData.birdies) || 0,
-      // 添加计算字段
-      calculatedStats: {
-        ...overallData,
-        // 确保所有字段都是数字
-        frontNine: Number(overallData.frontNine) || 0,
-        backNine: Number(overallData.backNine) || 0,
-        totalScore: Number(overallData.totalScore) || 0,
-        totalPutts: Number(overallData.totalPutts) || 0,
-        threePutts: Number(overallData.threePutts) || 0,
-        totalGir: Number(overallData.totalGir) || 0,
-        fairwaysHit: Number(overallData.fairwaysHit) || 0,
-        totalOb: Number(overallData.totalOb) || 0,
-        doubleBogeys: Number(overallData.doubleBogeys) || 0,
-        bogeys: Number(overallData.bogeys) || 0,
-        pars: Number(overallData.pars) || 0,
-        birdies: Number(overallData.birdies) || 0
-      }
+      frontNine: Number(formData.frontNine) || 0,
+      backNine: Number(formData.backNine) || 0,
+      totalScore: Number(formData.totalScore) || 0,
+      totalPutts: Number(formData.totalPutts) || 0,
+      threePutts: Number(formData.threePutts) || 0,
+      totalOb: Number(formData.totalOb) || 0,
+      totalGir: Number(formData.totalGir) || 0,
+      fairwaysHit: Number(formData.fairwaysHit) || 0,
+      // 新增四个字段
+      doubleBogeys: Number(formData.doubleBogeys) || 0,
+      pars: Number(formData.pars) || 0,
+      birdies: Number(formData.birdies) || 0,
+      bogeys: Number(formData.bogeys) || 0,
+      weather: (weather && weather.condition) ? weather : null,
+      holes: inputMode === 'detailed' ? holesData.map(h => ({
+        ...h,
+        strokes: Number(h.strokes) || 0,
+        putts: Number(h.putts) || 0,
+        ob: Number(h.ob) || 0
+      })) : []
     };
-    
-    // 如果使用18洞详情模式，保存每洞数据
-    if (inputMode === 'holes') {
-      finalData.holes = holesData.map(hole => ({
-        ...hole,
-        score: Number(hole.score) || 0,
-        putts: Number(hole.putts) || 0,
-        par: Number(hole.par) || 4,
-        ob: Number(hole.ob) || 0,
-        fairway: Boolean(hole.fairway),
-        gir: Boolean(hole.gir)
-      }));
-    }
-    
-    // 清理weather对象（如果字段为空则删除）
-    if (!formData.weather.condition && !formData.weather.temp && !formData.weather.wind) {
-      delete finalData.weather;
-    }
-    
+
     try {
-      setLoading(true);
-      
-      const res = await fetch('https://ai-golf-tracker.onrender.com/add-score', {
+      const response = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(finalData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      
-      if (res.ok) {
-        alert('成绩记录成功！');
-        navigate('/stats');
+      const responseData = await response.json();
+
+      if (response.ok) {
+        alert(`✅ 成绩保存成功！`);
+        if (onScoreAdded) onScoreAdded(responseData);
+        
+        setFormData(prev => ({
+            ...prev, courseName: '', totalScore: '', frontNine: '', backNine: '',
+            totalPutts: '', totalOb: 0, totalGir: '', threePutts: '', fairwaysHit: '', 
+            doubleBogeys: 0, pars: 0, birdies: 0, bogeys: 0, notes: ''
+        }));
+        setHolesData(initialHoles);
+        setIsExpanded(false);
+
+        if (onSuccess) onSuccess();
+        else navigate('/');
       } else {
-        const errorData = await res.json();
-        alert(`提交失败：${errorData.error || '未知错误'}`);
+        alert('❌ 保存失败: ' + (responseData.message || responseData.error || '未知错误'));
       }
-    } catch (err) {
-      console.error('提交错误:', err);
-      alert('网络错误，请稍后重试');
+    } catch (error) {
+      alert('❌ 网络错误: ' + error.message);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // 渲染单洞输入组件
-  const renderHoleInput = (hole, index) => {
-    return (
-      <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 hover:border-emerald-300 transition-colors">
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-gray-800 text-sm">第{hole.holeNumber}洞</span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-              Par {hole.par}
-            </span>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">杆数</label>
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={hole.score}
-              onChange={(e) => handleHoleChange(index, 'score', e.target.value)}
-              className="w-full border border-gray-300 rounded p-1 text-center text-sm"
-              placeholder="-"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">推杆</label>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              value={hole.putts}
-              onChange={(e) => handleHoleChange(index, 'putts', e.target.value)}
-              className="w-full border border-gray-300 rounded p-1 text-center text-sm"
-              placeholder="-"
-            />
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-1">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">OB</label>
-            <input
-              type="number"
-              min="0"
-              max="5"
-              value={hole.ob}
-              onChange={(e) => handleHoleChange(index, 'ob', e.target.value)}
-              className="w-full border border-gray-300 rounded p-1 text-center text-xs"
-            />
-          </div>
-          <div className="flex flex-col items-center">
-            <label className="text-xs text-gray-500 mb-1">FIR</label>
-            <button
-              onClick={() => handleHoleChange(index, 'fairway', !hole.fairway)}
-              className={`w-full text-xs py-1 rounded ${hole.fairway ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-gray-100 text-gray-500'}`}
-            >
-              {hole.fairway ? '✓' : '-'}
-            </button>
-          </div>
-          <div className="flex flex-col items-center">
-            <label className="text-xs text-gray-500 mb-1">GIR</label>
-            <button
-              onClick={() => handleHoleChange(index, 'gir', !hole.gir)}
-              className={`w-full text-xs py-1 rounded ${hole.gir ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'bg-gray-100 text-gray-500'}`}
-            >
-              {hole.gir ? '✓' : '-'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const inputClass = "w-full h-11 px-4 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-sm";
+  const labelClass = "block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide truncate"; 
+
+  const renderHoleInputs = (start, end) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs text-center border-collapse">
+        <thead>
+          <tr className="bg-emerald-50">
+            <th className="p-2 border border-emerald-100 rounded-tl-lg min-w-[40px]">Hole</th>
+            {Array.from({ length: 9 }).map((_, i) => (
+              <th key={i} className="p-2 border border-emerald-100 min-w-[35px]">{start + i}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {/* Par */}
+          <tr>
+            <td className="p-2 font-bold bg-gray-50 border">Par</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-0 border">
+                <input 
+                  type="number" 
+                  value={h.par}
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'par', parseInt(e.target.value))}
+                  className="w-full h-8 text-center bg-transparent outline-none focus:bg-yellow-50"
+                />
+              </td>
+            ))}
+          </tr>
+          {/* 杆数 */}
+          <tr>
+            <td className="p-2 font-bold bg-white border text-emerald-700">杆</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-0 border">
+                <input 
+                  type="number" 
+                  value={h.strokes}
+                  placeholder="-"
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'strokes', e.target.value)}
+                  className="w-full h-10 text-center font-bold text-lg outline-none focus:bg-emerald-50"
+                />
+              </td>
+            ))}
+          </tr>
+          {/* 推杆 */}
+          <tr>
+            <td className="p-2 font-bold bg-gray-50 border text-gray-500">推</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-0 border">
+                <input 
+                  type="number" 
+                  value={h.putts}
+                  placeholder=""
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'putts', e.target.value)}
+                  className="w-full h-8 text-center text-gray-600 outline-none focus:bg-blue-50"
+                />
+              </td>
+            ))}
+          </tr>
+          {/* OB */}
+          <tr>
+            <td className="p-2 font-bold bg-white border text-red-500">OB</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-0 border">
+                <input 
+                  type="number" 
+                  value={h.ob}
+                  placeholder=""
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'ob', e.target.value)}
+                  className="w-full h-8 text-center text-red-500 font-medium outline-none focus:bg-red-50"
+                />
+              </td>
+            ))}
+          </tr>
+          {/* GIR & FIR Checkboxes */}
+          <tr>
+            <td className="p-1 font-bold bg-gray-50 border text-[10px]">G/F</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-1 border h-8 align-middle">
+                <div className="flex flex-col items-center gap-1">
+                   {/* GIR (标On) */}
+                   <input 
+                      type="checkbox" 
+                      checked={h.gir} 
+                      onChange={(e) => handleHoleChange(start - 1 + i, 'gir', e.target.checked)} 
+                      title="GIR (标On)" 
+                      className="accent-emerald-500 w-3 h-3 cursor-pointer" 
+                   />
+                   {/* Fairway (上球道) */}
+                   <input 
+                      type="checkbox" 
+                      checked={h.fairway} 
+                      onChange={(e) => handleHoleChange(start - 1 + i, 'fairway', e.target.checked)} 
+                      title="FIR (上球道)" 
+                      className="accent-blue-500 w-3 h-3 cursor-pointer" 
+                   />
+                </div>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4 pb-20">
-      <div className="max-w-6xl mx-auto">
-        {/* 头部 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">记录新成绩</h1>
-              <p className="text-gray-500 text-sm mt-1">选择一种输入模式开始记录</p>
-            </div>
-            <button
-              onClick={() => navigate('/stats')}
-              className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition text-sm"
-            >
-              返回统计
-            </button>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 mb-8">
+      
+      <div onClick={() => setIsExpanded(!isExpanded)} className="p-5 flex justify-between items-center cursor-pointer hover:bg-gray-50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-xl">📝</div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">记分卡</h2>
+            <p className="text-xs text-emerald-600">账户: {JSON.parse(localStorage.getItem('user'))?.email || userEmail}</p>
           </div>
         </div>
-
-        {/* 模式选择 */}
-        <div className="bg-white rounded-xl p-4 mb-6 border border-gray-200 shadow-sm">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setInputMode('overall')}
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition flex-1 ${inputMode === 'overall' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              <div className="flex flex-col items-center">
-                <span className="text-lg mb-1">📊</span>
-                <span className="font-bold">整场数据模式</span>
-                <span className="text-xs mt-1">直接输入汇总数据</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setInputMode('holes')}
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition flex-1 ${inputMode === 'holes' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              <div className="flex flex-col items-center">
-                <span className="text-lg mb-1">⛳️</span>
-                <span className="font-bold">18洞详情模式</span>
-                <span className="text-xs mt-1">输入每洞数据，自动计算</span>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 基础信息 */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">基本信息</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  球场名称 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="courseName"
-                  value={formData.courseName}
-                  onChange={handleFormChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                  placeholder="请输入球场名称"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  日期 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleFormChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Tee台</label>
-                <select
-                  name="tees"
-                  value={formData.tees}
-                  onChange={handleFormChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-white"
-                >
-                  <option value="Black">⚫️ Black (黑Tee)</option>
-                  <option value="Gold">🟡 Gold (金Tee)</option>
-                  <option value="Blue">🔵 Blue (蓝Tee)</option>
-                  <option value="White">⚪️ White (白Tee)</option>
-                  <option value="Red">🔴 Red (红Tee)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 天气信息 */}
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">天气信息（可选）</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">天气状况</label>
-                  <select
-                    value={formData.weather.condition}
-                    onChange={(e) => handleWeatherChange('condition', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none bg-white"
-                  >
-                    <option value="">选择天气</option>
-                    {weatherConditions.map(cond => (
-                      <option key={cond} value={cond}>{cond}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">温度</label>
-                  <input
-                    type="text"
-                    placeholder="如：23°C"
-                    value={formData.weather.temp}
-                    onChange={(e) => handleWeatherChange('temp', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">风速</label>
-                  <input
-                    type="text"
-                    placeholder="如：12.2 km/h"
-                    value={formData.weather.wind}
-                    onChange={(e) => handleWeatherChange('wind', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 实时统计卡片 */}
-          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-6 border border-emerald-100 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-800">实时统计</h3>
-              {inputMode === 'holes' && calculatedStats && (
-                <span className="text-xs text-emerald-600 bg-white/60 px-3 py-1 rounded-full">
-                  根据每洞数据自动计算
-                </span>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-4 md:grid-cols-7 gap-3">
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-2xl font-bold text-emerald-700">{overallData.totalScore || 0}</div>
-                <div className="text-xs text-gray-500">总杆</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-blue-600">{overallData.totalPutts || 0}</div>
-                <div className="text-xs text-gray-500">总推杆</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-red-500">{overallData.threePutts || 0}</div>
-                <div className="text-xs text-gray-500">3推洞</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-cyan-600">{overallData.fairwaysHit || 0}</div>
-                <div className="text-xs text-gray-500">FIR</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-purple-600">{overallData.totalGir || 0}</div>
-                <div className="text-xs text-gray-500">GIR</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-red-600">{overallData.totalOb || 0}</div>
-                <div className="text-xs text-gray-500">OB</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-xl font-bold text-orange-600">{overallData.doubleBogeys || 0}</div>
-                <div className="text-xs text-gray-500">爆洞</div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-lg font-bold text-orange-500">{overallData.bogeys || 0}</div>
-                <div className="text-xs text-gray-500">鸡洞</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-lg font-bold text-green-600">{overallData.pars || 0}</div>
-                <div className="text-xs text-gray-500">Par洞</div>
-              </div>
-              <div className="text-center bg-white/80 rounded-lg p-3 border border-gray-100">
-                <div className="text-lg font-bold text-blue-600">{overallData.birdies || 0}</div>
-                <div className="text-xs text-gray-500">鸟洞</div>
-              </div>
-            </div>
-            
-            {/* 前后九分数 */}
-            <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-gray-200">
-              <div className="text-center">
-                <div className="text-sm text-gray-500">前九</div>
-                <div className="text-lg font-bold text-gray-700">{overallData.frontNine || 0}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-gray-500">后九</div>
-                <div className="text-lg font-bold text-gray-700">{overallData.backNine || 0}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* 整场数据输入模式 */}
-          {inputMode === 'overall' && (
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">整场数据输入</h3>
-              <p className="text-gray-500 text-sm mb-6">直接填写整场汇总数据（可覆盖自动计算的数据）</p>
-              
-              <div className="space-y-6">
-                {/* 核心数据 */}
-                <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                  <h4 className="font-bold text-emerald-800 text-sm mb-3">核心成绩</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">前九</label>
-                      <input
-                        type="number"
-                        name="frontNine"
-                        value={overallData.frontNine}
-                        onChange={handleOverallChange}
-                        className="w-full border border-gray-300 rounded-lg p-3 text-center text-lg font-bold"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">后九</label>
-                      <input
-                        type="number"
-                        name="backNine"
-                        value={overallData.backNine}
-                        onChange={handleOverallChange}
-                        className="w-full border border-gray-300 rounded-lg p-3 text-center text-lg font-bold"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-emerald-700 uppercase mb-1 block">总杆</label>
-                      <input
-                        type="number"
-                        name="totalScore"
-                        value={overallData.totalScore}
-                        onChange={handleOverallChange}
-                        className="w-full border border-emerald-300 rounded-lg p-3 text-center text-lg font-bold text-emerald-700 bg-white"
-                        placeholder="0"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 详细数据 */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">推杆 (总)</label>
-                    <input
-                      type="number"
-                      name="totalPutts"
-                      value={overallData.totalPutts}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">三推洞</label>
-                    <input
-                      type="number"
-                      name="threePutts"
-                      value={overallData.threePutts}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-red-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-red-500 uppercase mb-1 block">OB / 罚杆</label>
-                    <input
-                      type="number"
-                      name="totalOb"
-                      value={overallData.totalOb}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-red-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">GIR (标On)</label>
-                    <input
-                      type="number"
-                      name="totalGir"
-                      value={overallData.totalGir}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">FIR (上球道)</label>
-                    <input
-                      type="number"
-                      name="fairwaysHit"
-                      value={overallData.fairwaysHit}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-orange-500 uppercase mb-1 block">爆洞</label>
-                    <input
-                      type="number"
-                      name="doubleBogeys"
-                      value={overallData.doubleBogeys}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-orange-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-bold text-orange-500 uppercase mb-1 block">鸡洞</label>
-                    <input
-                      type="number"
-                      name="bogeys"
-                      value={overallData.bogeys}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-orange-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-green-600 uppercase mb-1 block">Par洞</label>
-                    <input
-                      type="number"
-                      name="pars"
-                      value={overallData.pars}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-green-600"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-blue-600 uppercase mb-1 block">鸟洞</label>
-                    <input
-                      type="number"
-                      name="birdies"
-                      value={overallData.birdies}
-                      onChange={handleOverallChange}
-                      className="w-full border border-gray-300 rounded-lg p-3 text-center text-blue-600"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 18洞详情输入模式 */}
-          {inputMode === 'holes' && (
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">18洞详情输入</h3>
-              <p className="text-gray-500 text-sm mb-6">填写每洞数据，上方统计将实时计算</p>
-              
-              {/* 洞数切换标签 */}
-              <div className="flex mb-6 border-b border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setActiveHoleTab('frontNine')}
-                  className={`px-6 py-3 font-medium text-sm transition ${activeHoleTab === 'frontNine' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  前九洞 (1-9)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveHoleTab('backNine')}
-                  className={`px-6 py-3 font-medium text-sm transition ${activeHoleTab === 'backNine' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  后九洞 (10-18)
-                </button>
-              </div>
-              
-              {/* 前九洞 */}
-              {activeHoleTab === 'frontNine' && (
-                <div className="grid grid-cols-3 md:grid-cols-9 gap-2">
-                  {holesData.slice(0, 9).map((hole, index) => renderHoleInput(hole, index))}
-                </div>
-              )}
-              
-              {/* 后九洞 */}
-              {activeHoleTab === 'backNine' && (
-                <div className="grid grid-cols-3 md:grid-cols-9 gap-2">
-                  {holesData.slice(9, 18).map((hole, index) => renderHoleInput(hole, index + 9))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 备注 */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">备注</h3>
-            <VoiceTextarea 
-              value={formData.notes} 
-              onChange={(e) => setFormData(prev => ({...prev, notes: e.target.value}))} 
-              placeholder="记录一下心情、表现或特别事项..."
-            />
-          </div>
-
-          {/* 操作按钮 */}
-          <div className="sticky bottom-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-gray-200 shadow-lg">
-            <div className="flex justify-between items-center">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
-                >
-                  重置表单
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/stats')}
-                  className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
-                >
-                  取消
-                </button>
-              </div>
-              
-              <div className="flex gap-2">
-                {inputMode === 'holes' && calculatedStats && (
-                  <div className="mr-4 text-xs text-gray-500">
-                    已计算: {calculatedStats.totalScore}杆, {calculatedStats.totalPutts}推
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      保存中...
-                    </>
-                  ) : (
-                    '保存成绩'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
+        <span className={`text-2xl text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
       </div>
+
+      {isExpanded && (
+        <form onSubmit={handleSubmit} className="p-5 pt-0 animate-fadeIn space-y-5">
+          
+          <div className="flex justify-center mb-2">
+            <div className="bg-gray-100 p-1 rounded-lg flex text-sm font-medium">
+              <button 
+                type="button"
+                onClick={() => setInputMode('simple')}
+                className={`px-4 py-1.5 rounded-md transition-all ${inputMode === 'simple' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                ⚡️ 整场模式
+              </button>
+              <button 
+                type="button"
+                onClick={() => setInputMode('detailed')}
+                className={`px-4 py-1.5 rounded-md transition-all ${inputMode === 'detailed' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500'}`}
+              >
+                📊 18洞详情模式
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>球场名称</label>
+                <input type="text" name="courseName" placeholder="例如：观澜湖" value={formData.courseName} onChange={handleChange} onBlur={(e) => fetchWeather(e.target.value)} className={inputClass} required />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                 <div>
+                    <label className={labelClass}>日期</label>
+                    <input type="date" name="date" value={formData.date} onChange={handleChange} className={inputClass} required />
+                 </div>
+                 <div>
+                    <label className={labelClass}>Tee台</label>
+                    <select name="tees" value={formData.tees} onChange={handleChange} className={inputClass}>
+                      <option value="Black">⚫️ 黑</option>
+                      <option value="Gold">🟡 金</option>
+                      <option value="Blue">🔵 蓝</option>
+                      <option value="White">⚪️ 白</option>
+                      <option value="Red">🔴 红</option>
+                    </select>
+                 </div>
+              </div>
+          </div>
+
+          {(loadingWeather || weather.condition || weatherError) && (
+              <div className={`p-3 rounded-xl border text-sm flex items-center gap-3 ${weatherError ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-800'}`}>
+                 {loadingWeather ? '获取天气中...' : weatherError ? weatherError : `${weather.condition} ${weather.temp} (${weather.wind})`}
+              </div>
+          )}
+
+          {inputMode === 'detailed' ? (
+            <div className="space-y-4">
+                <div className="bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <span className="text-xs font-bold text-gray-500 mb-2 block px-1">前九 (Front 9)</span>
+                    {renderHoleInputs(1, 9)}
+                </div>
+                <div className="bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <span className="text-xs font-bold text-gray-500 mb-2 block px-1">后九 (Back 9)</span>
+                    {renderHoleInputs(10, 18)}
+                </div>
+            </div>
+          ) : (
+            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50 grid grid-cols-3 gap-4">
+                <div className="col-span-1">
+                    <label className={labelClass + " text-center"}>前九</label>
+                    <input type="number" name="frontNine" value={formData.frontNine} onChange={handleChange} className={`${inputClass} text-center`} />
+                </div>
+                <div className="col-span-1">
+                    <label className={labelClass + " text-center"}>后九</label>
+                    <input type="number" name="backNine" value={formData.backNine} onChange={handleChange} className={`${inputClass} text-center`} />
+                </div>
+                <div className="col-span-1">
+                    <label className="block text-xs font-bold text-emerald-700 mb-1.5 text-center uppercase">总杆</label>
+                    <input type="number" name="totalScore" value={formData.totalScore} readOnly className={`${inputClass} text-center font-extrabold text-xl text-emerald-700 bg-white`} />
+                </div>
+            </div>
+          )}
+
+          {/* 公共统计数据区：第一行 6列布局 */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+             {/* 1. 总杆 (新增) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="总杆数">总杆</label>
+                <input 
+                  type="number" 
+                  name="totalScore" 
+                  value={formData.totalScore} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} font-bold text-emerald-700 ${inputMode === 'detailed' ? 'bg-gray-100' : 'bg-white'} px-2`} 
+                />
+             </div>
+
+             {/* 2. 总推 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="总推杆数">总推</label>
+                <input type="number" name="totalPutts" value={formData.totalPutts} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+             
+             {/* 3. 3推 */}
+             <div className="col-span-1">
+                <label className={labelClass} title="3推洞数">3推</label>
+                <input type="number" name="threePutts" value={formData.threePutts} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+
+             {/* 4. FIR */}
+             <div className="col-span-1">
+                <label className={labelClass} title="上球道数">FIR (上球道)</label>
+                <input type="number" name="fairwaysHit" value={formData.fairwaysHit} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+             
+             {/* 5. GIR */}
+             <div className="col-span-1">
+                <label className={labelClass} title="标On数">GIR (标On)</label>
+                <input type="number" name="totalGir" value={formData.totalGir} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+             
+             {/* 6. OB */}
+             <div className="col-span-1">
+                <label className={labelClass}>OB</label>
+                <input type="number" name="totalOb" value={formData.totalOb} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} text-red-500 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
+             </div>
+          </div>
+
+          {/* 新增的四个字段：爆洞、鸡洞、Par洞、鸟洞 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+             {/* 1. 爆洞 (doubleBogeys) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="大于等于标准杆2杆">爆洞</label>
+                <input 
+                  type="number" 
+                  name="doubleBogeys" 
+                  value={formData.doubleBogeys} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} text-orange-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 2. 鸡洞 (bogeys) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="大于标准杆1杆">鸡洞</label>
+                <input 
+                  type="number" 
+                  name="bogeys" 
+                  value={formData.bogeys} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} text-orange-500 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 3. Par洞 (pars) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="标准杆">Par洞</label>
+                <input 
+                  type="number" 
+                  name="pars" 
+                  value={formData.pars} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} text-green-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+
+             {/* 4. 鸟洞 (birdies) */}
+             <div className="col-span-1">
+                <label className={labelClass} title="小于标准杆1杆">鸟洞</label>
+                <input 
+                  type="number" 
+                  name="birdies" 
+                  value={formData.birdies} 
+                  onChange={handleChange} 
+                  readOnly={inputMode === 'detailed'} 
+                  className={`${inputClass} text-blue-600 ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} 
+                />
+             </div>
+          </div>
+
+          <div>
+              <label className={labelClass}>备注</label>
+              <VoiceTextarea value={formData.notes} onChange={handleChange} placeholder="记录一下心情..." />
+          </div>
+
+          <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-emerald-700 active:scale-[0.99] transition-all">
+            {isSubmitting ? '保存中...' : '💾 保存成绩'}
+          </button>
+        </form>
+      )}
     </div>
   );
 };
 
-export default AddScore;
+export default AddScoreForm;
