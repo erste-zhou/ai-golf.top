@@ -445,128 +445,263 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
 
       {/* --- 历史记录列表 --- */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-md font-bold text-gray-800">历史记录</h3>
-          <span className="text-xs text-gray-400 bg-white px-2 py-1 rounded border">共 {sortedScoresDesc.length} 场</span>
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+          <div>
+            <h3 className="text-md font-bold text-gray-800">历史记录</h3>
+            <p className="text-xs text-gray-400 mt-1">点击右侧菜单可编辑或删除记录</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400 bg-white px-3 py-1.5 rounded-full border shadow-sm">
+              共 <span className="font-bold text-emerald-600">{sortedScoresDesc.length}</span> 场
+            </span>
+          </div>
         </div>
 
-        {/* 1. 电脑端显示表格 */}
-        <table className="min-w-full hidden md:table divide-y divide-gray-100">
-            <thead className="bg-gray-50">
+        {/* 1. 电脑端显示表格 - 优化版 */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50/80">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期 / 天气</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">球场</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">总杆</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">推杆 / 3推</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">FIR / GIR</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">OB / 爆洞</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">鸡/Par/鸟</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                  日期 / 球场
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                  总杆成绩
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  推杆表现
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  击球精度
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  失误控制
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                  成绩分布
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {sortedScoresDesc.map((score) => (
                 <React.Fragment key={score._id}>
-                  <tr className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{new Date(score.date).toLocaleDateString()}</div>
-                      {score.weather && (
-                        <div className="mt-1">
-                          <div className="flex items-center gap-1 text-xs">
-                            <span className="text-sm">{getWeatherIcon(score.weather.condition)}</span>
-                            <span className="font-medium text-blue-600">{score.weather.temp}</span>
-                            <span className="text-gray-300 mx-1">•</span>
-                            <span className="text-gray-600">{score.weather.condition}</span>
+                  <tr className="hover:bg-emerald-50/30 transition-colors duration-150 group">
+                    {/* 日期/球场列 */}
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-start gap-3">
+                        {/* 日期卡片 */}
+                        <div className="text-center min-w-[3.5rem]">
+                          <div className="text-xs text-gray-500 uppercase mb-1">
+                            {new Date(score.date).toLocaleDateString('zh-CN', { weekday: 'short' })}
                           </div>
-                          {score.weather.wind && (
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              <span className="mr-1">🌬️</span>风速: {score.weather.wind}
+                          <div className="bg-gray-50 rounded-lg p-2">
+                            <div className="text-lg font-bold text-gray-800">
+                              {new Date(score.date).getDate()}
+                            </div>
+                            <div className="text-[10px] text-gray-400">
+                              {new Date(score.date).toLocaleDateString('zh-CN', { month: 'short' })}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 球场信息 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{score.courseName}</div>
+                          <div className="text-xs text-gray-500 mt-1">{score.tees} Tees</div>
+                          
+                          {/* 天气信息 */}
+                          {score.weather && (
+                            <div className="mt-2">
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-sm">{getWeatherIcon(score.weather.condition)}</span>
+                                <span className="font-medium text-gray-700">{score.weather.temp}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="text-gray-600 truncate">{score.weather.condition}</span>
+                              </div>
+                              {score.weather.wind && (
+                                <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                                  <span>🌬️</span>
+                                  <span>{score.weather.wind}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
+                      </div>
+                    </td>
+
+                    {/* 总杆成绩列 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <div className="flex flex-col items-center">
+                        <div className="relative">
+                          <div className="text-2xl font-bold text-emerald-700 mb-1">{score.totalScore}</div>
+                          <div className="absolute -top-1 -right-3">
+                            <div className={`text-xs px-1.5 py-0.5 rounded-full ${
+                              score.totalScore < 80 ? 'bg-emerald-100 text-emerald-700' : 
+                              score.totalScore < 90 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {score.totalScore < 80 ? '优秀' : score.totalScore < 90 ? '良好' : '加油'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full mt-1">
+                          前{score.frontNine}/{score.backNine}后
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 推杆表现列 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">总推杆</div>
+                          <div className={`text-lg font-bold ${score.totalPutts <= 30 ? 'text-blue-600' : 'text-gray-700'}`}>
+                            {score.totalPutts}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">3推洞</div>
+                          <div className={`text-lg font-bold ${score.threePutts > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            {score.threePutts || 0}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 击球精度列 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">FIR</div>
+                          <div className="text-lg font-bold text-cyan-600">{score.fairwaysHit || '-'}</div>
+                          <div className="text-[10px] text-gray-400">上球道</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">GIR</div>
+                          <div className="text-lg font-bold text-purple-600">{score.totalGir}</div>
+                          <div className="text-[10px] text-gray-400">标On</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 失误控制列 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">OB</div>
+                          <div className={`text-lg font-bold ${score.totalOb > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                            {score.totalOb || 0}
+                          </div>
+                          <div className="text-[10px] text-gray-400">罚杆</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">爆洞</div>
+                          <div className={`text-lg font-bold ${score.doubleBogeys > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
+                            {score.doubleBogeys || 0}
+                          </div>
+                          <div className="text-[10px] text-gray-400">+2以上</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 成绩分布列 */}
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="space-y-3">
+                        {/* 进度条样式 */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-blue-600 font-medium">鸟洞</span>
+                            <span className="font-bold">{score.birdies || 0}</span>
+                          </div>
+                          <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                              style={{ width: `${((score.birdies || 0) / 18 * 100).toFixed(0)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-green-600 font-medium">Par洞</span>
+                            <span className="font-bold">{score.pars || 0}</span>
+                          </div>
+                          <div className="h-2 bg-green-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-green-500 rounded-full transition-all duration-500"
+                              style={{ width: `${((score.pars || 0) / 18 * 100).toFixed(0)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-orange-500 font-medium">鸡洞</span>
+                            <span className="font-bold">{score.bogeys || 0}</span>
+                          </div>
+                          <div className="h-2 bg-orange-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                              style={{ width: `${((score.bogeys || 0) / 18 * 100).toFixed(0)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 操作列 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-right relative">
+                      <button 
+                        onClick={() => setActiveDropdownId(activeDropdownId === score._id ? null : score._id)}
+                        className="text-gray-400 hover:text-emerald-600 font-bold px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        ⋮
+                      </button>
+                      {activeDropdownId === score._id && (
+                        <div className="absolute right-8 top-0 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-10 py-1 text-left">
+                          <button 
+                            onClick={() => openEditModal(score)} 
+                            className="block w-full text-left px-4 py-2 hover:bg-emerald-50 text-gray-700 text-xs flex items-center gap-2"
+                          >
+                            <span>✏️</span>
+                            <span>编辑</span>
+                          </button>
+                          <button 
+                            onClick={() => onDelete(score._id)} 
+                            className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-xs flex items-center gap-2"
+                          >
+                            <span>🗑️</span>
+                            <span>删除</span>
+                          </button>
+                        </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{score.courseName}</div>
-                      <div className="text-xs text-gray-500">{score.tees} Tees</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="text-lg font-bold text-emerald-700">{score.totalScore}</span>
-                      <span className="text-xs text-gray-400 ml-1">({score.frontNine}/{score.backNine})</span>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <div className="flex justify-center items-center gap-1">
-                          <span className="font-medium text-blue-600">{score.totalPutts}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className={`font-medium ${score.threePutts > 0 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                            {score.threePutts || 0}
-                          </span>
-                      </div>
-                      <div className="text-[10px] text-gray-300 uppercase tracking-tighter">Putts / 3-Putt</div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <div className="flex justify-center items-center gap-1">
-                          <span className="font-medium text-cyan-600">{score.fairwaysHit || '-'}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className="font-medium text-purple-600">{score.totalGir}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-300 uppercase tracking-tighter">FIR / GIR</div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1">
-                          <span className={`font-medium ${score.totalOb > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                            {score.totalOb || 0}
-                          </span>
-                          <span className="text-gray-300">/</span>
-                          <span className={`font-medium ${score.doubleBogeys > 0 ? 'text-orange-600 font-bold' : 'text-gray-400'}`}>
-                            {score.doubleBogeys || 0}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-gray-300 uppercase tracking-tighter">OB / 爆洞</div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-orange-500">{score.bogeys || 0}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className="font-medium text-green-600">{score.pars || 0}</span>
-                          <span className="text-gray-300">/</span>
-                          <span className="font-medium text-blue-600">{score.birdies || 0}</span>
-                        </div>
-                        <div className="text-[10px] text-gray-300 uppercase tracking-tighter">鸡/Par/鸟</div>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm relative">
-                       <button onClick={() => setActiveDropdownId(activeDropdownId === score._id ? null : score._id)} className="text-gray-400 hover:text-emerald-600 font-bold px-2">⋮</button>
-                       {activeDropdownId === score._id && (
-                          <div className="absolute right-8 top-0 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-10 py-1 text-left">
-                            <button onClick={() => openEditModal(score)} className="block w-full text-left px-4 py-2 hover:bg-emerald-50 text-gray-700 text-xs">✏️ 编辑</button>
-                            <button onClick={() => onDelete(score._id)} className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-xs">🗑 删除</button>
-                          </div>
-                       )}
-                    </td>
                   </tr>
-                  {/* 电脑端备注 */}
+                  
+                  {/* 备注行 */}
                   {score.notes && (
-                    <tr className="bg-gray-50/30">
-                        <td colSpan="8" className="px-6 py-2 text-xs text-gray-500 italic border-b border-gray-100">
-                            <span className="mr-2">📝</span>{score.notes}
-                        </td>
+                    <tr className="bg-gray-50/50">
+                      <td colSpan="7" className="px-4 py-3">
+                        <div className="flex items-start gap-2 text-sm text-gray-600 bg-white/80 rounded-lg p-3 border border-gray-100">
+                          <div className="text-gray-400 mt-0.5">📝</div>
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 font-medium mb-1">备注</div>
+                            <div className="text-gray-700">{score.notes}</div>
+                          </div>
+                        </div>
+                      </td>
                     </tr>
                   )}
                 </React.Fragment>
               ))}
             </tbody>
-        </table>
+          </table>
+        </div>
 
-        {/* 2. 手机端显示卡片 */}
+        {/* 2. 手机端显示卡片 - 保持原有样式 */}
         <div className="md:hidden p-4 space-y-4 bg-gray-50/50">
             {sortedScoresDesc.map((score) => (
                 <div key={score._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
