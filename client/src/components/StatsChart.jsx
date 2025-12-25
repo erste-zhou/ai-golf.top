@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown'; // 引入 Markdown 渲染组件
+import ReactMarkdown from 'react-markdown';
 import VoiceTextarea from './VoiceTextarea';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -54,6 +54,20 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
   // 按日期排序用于列表和AI分析 (新 -> 旧)
   const sortedScoresDesc = [...scores].sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  // 天气图标映射
+  const getWeatherIcon = (condition) => {
+    if (!condition) return '🌤️';
+    const lowerCond = condition.toLowerCase();
+    if (lowerCond.includes('晴')) return '☀️';
+    if (lowerCond.includes('云')) return '⛅';
+    if (lowerCond.includes('雨')) return '🌧️';
+    if (lowerCond.includes('阴')) return '☁️';
+    if (lowerCond.includes('雪')) return '❄️';
+    if (lowerCond.includes('雾')) return '🌫️';
+    if (lowerCond.includes('雷')) return '⛈️';
+    return '🌤️';
+  };
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -61,13 +75,23 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
         <div className="bg-white/95 backdrop-blur-sm p-3 border border-gray-100 shadow-xl rounded-lg text-sm z-50">
           <p className="font-bold mb-1 text-gray-800">{label}</p>
           <p className="text-xs text-gray-500 mb-2">{data.courseName}</p>
+          {data.weather && (
+            <div className="mb-2 p-2 bg-blue-50 rounded border border-blue-100">
+              <div className="flex items-center gap-1 text-blue-600 text-xs">
+                <span>{getWeatherIcon(data.weather.condition)}</span>
+                <span className="font-medium">{data.weather.temp}</span>
+                <span className="text-gray-500">•</span>
+                <span>{data.weather.condition}</span>
+              </div>
+            </div>
+          )}
           <div className="border-t border-gray-100 pt-2 space-y-1">
-             {payload.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill }}></span>
-                  <span className="font-medium text-gray-700">{entry.name}: {entry.value}</span>
-                </div>
-             ))}
+            {payload.map((entry, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.stroke || entry.fill }}></span>
+                <span className="font-medium text-gray-700">{entry.name}: {entry.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -207,7 +231,6 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
       alert("网络错误，更新失败");
     }
   };
-
 
   // ==========================================
   // 5. 渲染 UI
@@ -407,7 +430,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
         <table className="min-w-full hidden md:table divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期 / 天气</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">球场</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">总杆</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">FIR / GIR</th>
@@ -420,7 +443,24 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
               {sortedScoresDesc.map((score) => (
                 <React.Fragment key={score._id}>
                   <tr className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(score.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{new Date(score.date).toLocaleDateString()}</div>
+                      {score.weather && (
+                        <div className="mt-1">
+                          <div className="flex items-center gap-1 text-xs">
+                            <span className="text-sm">{getWeatherIcon(score.weather.condition)}</span>
+                            <span className="font-medium text-blue-600">{score.weather.temp}</span>
+                            <span className="text-gray-300 mx-1">•</span>
+                            <span className="text-gray-600">{score.weather.condition}</span>
+                          </div>
+                          {score.weather.wind && (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              <span className="mr-1">🌬️</span>风速: {score.weather.wind}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{score.courseName}</div>
                       <div className="text-xs text-gray-500">{score.tees} Tees</div>
@@ -458,7 +498,6 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                        {activeDropdownId === score._id && (
                           <div className="absolute right-8 top-0 w-32 bg-white rounded-lg shadow-xl border border-gray-100 z-10 py-1 text-left">
                             <button onClick={() => openEditModal(score)} className="block w-full text-left px-4 py-2 hover:bg-emerald-50 text-gray-700 text-xs">✏️ 编辑</button>
-                            {/* 修改处 1: 移除 window.confirm，直接删除 */}
                             <button onClick={() => onDelete(score._id)} className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-xs">🗑 删除</button>
                           </div>
                        )}
@@ -486,14 +525,30 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                     <div className="flex justify-between items-start mb-3 relative z-10">
                         <div>
                             <h4 className="font-bold text-gray-800 text-lg">{score.courseName}</h4>
-                            <p className="text-xs text-gray-400">{new Date(score.date).toLocaleDateString()} · {score.tees} Tees</p>
+                            <div className="mb-1">
+                              <p className="text-xs text-gray-400">{new Date(score.date).toLocaleDateString()} · {score.tees} Tees</p>
+                              {score.weather && (
+                                <div className="mt-1">
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <span className="text-sm">{getWeatherIcon(score.weather.condition)}</span>
+                                    <span className="font-medium text-blue-600">{score.weather.temp}</span>
+                                    <span className="text-gray-300 mx-1">•</span>
+                                    <span className="text-gray-600">{score.weather.condition}</span>
+                                  </div>
+                                  {score.weather.wind && (
+                                    <div className="text-xs text-gray-400 mt-0.5">
+                                      <span className="mr-0.5">🌬️</span>{score.weather.wind}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                         </div>
                         <div className="relative">
                             <button onClick={() => setActiveDropdownId(activeDropdownId === score._id ? null : score._id)} className="p-2 -mr-2 text-gray-300 hover:text-emerald-600 font-bold text-xl">⋮</button>
                             {activeDropdownId === score._id && (
                                 <div className="absolute right-0 top-8 w-28 bg-white rounded-lg shadow-xl border border-gray-100 z-20 py-1 text-left">
                                     <button onClick={() => openEditModal(score)} className="block w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">✏️ 编辑</button>
-                                    {/* 修改处 2: 移除 window.confirm，直接删除 */}
                                     <button onClick={() => onDelete(score._id)} className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm">🗑 删除</button>
                                 </div>
                             )}
