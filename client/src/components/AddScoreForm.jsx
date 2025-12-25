@@ -36,7 +36,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
     totalPutts: '',
     threePutts: '', // 3推
     fairwaysHit: '', // FIR (上球道)
-    totalGir: '',    // GIR (标On)
+    totalGir: '',    // GIR (标ON)
     totalOb: 0,
     // 新增四个字段
     doubleBogeys: 0,  // 爆洞
@@ -82,7 +82,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         // 累计 OB
         tOb += obVal;
 
-        // 累计 GIR (标On)
+        // 累计 GIR (标ON)
         if (h.gir) tGir++;
 
         // 累计 FIR (上球道)
@@ -113,7 +113,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         totalPutts: tPutts || '',
         threePutts: t3Putts || '',
         totalOb: tOb || '',
-        totalGir: tGir || '',       // 实时更新标On数
+        totalGir: tGir || '',       // 实时更新标ON数
         fairwaysHit: tFairway || '', // 实时更新上球道数
         // 更新新增四个字段
         doubleBogeys: doubleBogeysCount || 0,
@@ -230,6 +230,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       return;
     }
 
+    // ✅ 修改点1：确保爆洞字段名前后一致
     // 数据清洗，防止空值报错
     const payload = {
       email: finalEmail.trim().toLowerCase(),
@@ -242,11 +243,11 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       totalOb: Number(formData.totalOb) || 0,
       totalGir: Number(formData.totalGir) || 0,
       fairwaysHit: Number(formData.fairwaysHit) || 0,
-      // 新增四个字段
-      doubleBogeys: Number(formData.doubleBogeys) || 0,
-      pars: Number(formData.pars) || 0,
-      birdies: Number(formData.birdies) || 0,
-      bogeys: Number(formData.bogeys) || 0,
+      // ✅ 确保这四个字段都被正确转换为数字并发送
+      doubleBogeys: Number(formData.doubleBogeys) || 0,  // 爆洞
+      pars: Number(formData.pars) || 0,                  // Par洞
+      birdies: Number(formData.birdies) || 0,            // 鸟洞
+      bogeys: Number(formData.bogeys) || 0,              // 鸡洞
       weather: (weather && weather.condition) ? weather : null,
       holes: inputMode === 'detailed' ? holesData.map(h => ({
         ...h,
@@ -368,12 +369,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
             {holesData.slice(start - 1, end).map((h, i) => (
               <td key={i} className="p-1 border h-8 align-middle">
                 <div className="flex flex-col items-center gap-1">
-                   {/* GIR (标On) */}
+                   {/* GIR (标ON) */}
                    <input 
                       type="checkbox" 
                       checked={h.gir} 
                       onChange={(e) => handleHoleChange(start - 1 + i, 'gir', e.target.checked)} 
-                      title="GIR (标On)" 
+                      title="GIR (标ON)" 
                       className="accent-emerald-500 w-3 h-3 cursor-pointer" 
                    />
                    {/* Fairway (上球道) */}
@@ -521,7 +522,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
              
              {/* 5. GIR */}
              <div className="col-span-1">
-                <label className={labelClass} title="标On数">GIR (标On)</label>
+                <label className={labelClass} title="标ON数">GIR (标ON)</label>
                 <input type="number" name="totalGir" value={formData.totalGir} onChange={handleChange} readOnly={inputMode === 'detailed'} className={`${inputClass} ${inputMode === 'detailed' ? 'bg-gray-100' : ''} px-2`} />
              </div>
              

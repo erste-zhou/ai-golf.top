@@ -533,19 +533,12 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                       </div>
                     </td>
 
-                    {/* 总杆成绩列 */}
+                    {/* ✅ 修改点1：总杆成绩列 - 移除"加油"标签 */}
                     <td className="px-4 py-4 whitespace-nowrap text-center">
                       <div className="flex flex-col items-center">
                         <div className="relative">
                           <div className="text-2xl font-bold text-emerald-700 mb-1">{score.totalScore}</div>
-                          <div className="absolute -top-1 -right-3">
-                            <div className={`text-xs px-1.5 py-0.5 rounded-full ${
-                              score.totalScore < 80 ? 'bg-emerald-100 text-emerald-700' : 
-                              score.totalScore < 90 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {score.totalScore < 80 ? '优秀' : score.totalScore < 90 ? '良好' : '加油'}
-                            </div>
-                          </div>
+                          {/* ✅ 移除"优秀/良好/加油"标签 */}
                         </div>
                         <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full mt-1">
                           前{score.frontNine}/{score.backNine}后
@@ -701,7 +694,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
           </table>
         </div>
 
-        {/* 2. 手机端显示卡片 - 保持原有样式 */}
+        {/* 2. 手机端显示卡片 - 保持原有样式，手机端本来就没有"加油"标签 */}
         <div className="md:hidden p-4 space-y-4 bg-gray-50/50">
             {sortedScoresDesc.map((score) => (
                 <div key={score._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
