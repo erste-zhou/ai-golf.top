@@ -11,7 +11,9 @@ router.post('/add-score', async (req, res) => {
         const { 
             email, courseName, date, tees, holes, weather, notes,
             // 下面这些可能是字符串，需要转换
-            frontNine, backNine, totalScore, totalPutts, fairwaysHit, threePutts, totalGir, totalOb
+            frontNine, backNine, totalScore, totalPutts, fairwaysHit, threePutts, totalGir, totalOb,
+            // ✅ 新增这四个字段
+            doubleBogeys, pars, birdies, bogeys
         } = req.body;
 
         // 2. 构造基础数据对象
@@ -36,6 +38,11 @@ router.post('/add-score', async (req, res) => {
         scoreData.threePutts = Number(threePutts) || 0;
         scoreData.totalGir = Number(totalGir) || 0;
         scoreData.totalOb = Number(totalOb) || 0;
+        // ✅ 新增：这四个字段也必须转换
+        scoreData.doubleBogeys = Number(doubleBogeys) || 0;
+        scoreData.pars = Number(pars) || 0;
+        scoreData.birdies = Number(birdies) || 0;
+        scoreData.bogeys = Number(bogeys) || 0;
 
         // 注意：这里不需要再写 if/else 判断是简单还是详细模式了
         // 因为如果 holes 有数据，Model 里的 pre-save 钩子会自动重算这些值并覆盖掉上面的 0
@@ -47,6 +54,14 @@ router.post('/add-score', async (req, res) => {
         const savedScore = await newScore.save();
 
         console.log("✅ 保存成功 ID:", savedScore._id);
+        // ✅ 添加日志，确认四个字段已保存
+        console.log("✅ 爆洞等字段:", {
+            doubleBogeys: savedScore.doubleBogeys,
+            pars: savedScore.pars,
+            birdies: savedScore.birdies,
+            bogeys: savedScore.bogeys
+        });
+        
         res.status(201).json({ message: '成绩记录成功！', data: savedScore });
 
     } catch (err) {
@@ -55,29 +70,3 @@ router.post('/add-score', async (req, res) => {
         res.status(500).json({ error: '保存失败', details: err.message });
     }
 });
-
-// GET /my-scores
-router.get('/my-scores', async (req, res) => {
-    const { email } = req.query; 
-    if (!email) return res.status(400).json({ error: '需要提供 Email' });
-
-    try {
-        const scores = await Scorecard.find({ email }).sort({ date: -1 });
-        res.json(scores);
-    } catch (err) {
-        res.status(500).json({ error: '获取数据失败' });
-    }
-});
-
-// GET /score-detail/:id
-router.get('/score-detail/:id', async (req, res) => {
-    try {
-        const score = await Scorecard.findById(req.params.id);
-        if (!score) return res.status(404).json({ error: '未找到记录' });
-        res.json(score);
-    } catch (err) {
-        res.status(500).json({ error: '获取详情失败' });
-    }
-});
-
-module.exports = router;
