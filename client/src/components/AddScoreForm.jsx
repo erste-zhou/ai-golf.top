@@ -9,7 +9,7 @@ const API_URL = 'https://ai-golf-tracker.onrender.com/add-score';
 const initialHoles = Array.from({ length: 18 }, (_, i) => ({
   number: i + 1,
   par: i < 9 ? 4 : 4,
-  strokes: '',        // 杆数
+  strokes: '',        // 杆数（已经是总杆，包含OB）
   putts: '',          // 推杆
   fairway: false,     // 上球道 (FIR)
   gir: false,         // 标On (GIR)
@@ -67,7 +67,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         const obVal = parseInt(h.ob) || 0;
         const par = h.par || 4;
 
-        // 计算杆数
+        // 计算杆数（strokes已经是总杆数，包含OB）
         if (s > 0) {
           if (h.number <= 9) f9 += s;
           else b9 += s;
@@ -89,15 +89,11 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         // 累计 FIR (上球道)
         if (h.fairway) tFairway++;
 
-        // ✅ 修复：计算新增五个字段（爆洞 = 2倍标准杆）
-        if (s > 0 && par > 0) {
+        // 计算新增五个字段（与标准杆比较）
+        if (s > 0) {
           const diff = s - par;
-          const timesPar = s / par;  // 计算相对于标准杆的倍数
-          
-          if (timesPar >= 2) {
-            doubleBogeysCount++; // 爆洞：2倍标准杆及以上
-          } else if (diff >= 2) {
-            doubleBogeysCount++; // 双柏忌及以上
+          if (diff >= 2) {
+            doubleBogeysCount++; // 爆洞：大于等于标准杆2杆
           } else if (diff === 1) {
             bogeysCount++; // 鸡洞：大于标准杆1杆
           } else if (diff === 0) {
@@ -246,24 +242,13 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
           const s = parseInt(h.strokes) || 0;
           const par = h.par || 4;
           
-          if (s > 0 && par > 0) {
+          if (s > 0) {
             const diff = s - par;
-            const timesPar = s / par;  // 计算倍数
-            
-            // ✅ 修复：爆洞 = 2倍标准杆及以上
-            if (timesPar >= 2) {
-              doubleBogeys++; // 爆洞：2倍标准杆及以上
-            } else if (diff >= 2) {
-              doubleBogeys++; // 双柏忌及以上
-            } else if (diff === 1) {
-              bogeys++; // 鸡洞
-            } else if (diff === 0) {
-              pars++; // Par洞
-            } else if (diff === -1) {
-              birdies++; // 鸟洞
-            } else if (diff <= -2) {
-              eagles++; // 老鹰洞
-            }
+            if (diff >= 2) doubleBogeys++;
+            else if (diff === 1) bogeys++;
+            else if (diff === 0) pars++;
+            else if (diff === -1) birdies++;
+            else if (diff <= -2) eagles++;
           }
         });
         
@@ -285,52 +270,31 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
 
     // ✅ 数据清洗，防止空值报错
     const payload = {
-      // 🟡 回传字段：基础信息
       email: finalEmail.trim().toLowerCase(),
-      courseName: formData.courseName,
-      date: formData.date,
-      tees: formData.tees || 'Blue',
-      
-      // 🟡 回传字段：成绩字段
+      ...formData,
       frontNine: Number(formData.frontNine) || 0,
       backNine: Number(formData.backNine) || 0,
       totalScore: Number(formData.totalScore) || 0,
-      
-      // 🟡 回传字段：推杆统计
       totalPutts: Number(formData.totalPutts) || 0,
       threePutts: Number(formData.threePutts) || 0,
-      
-      // 🟡 回传字段：击球准确度
-      fairwaysHit: Number(formData.fairwaysHit) || 0,
-      totalGir: Number(formData.totalGir) || 0,
-      
-      // 🟡 回传字段：失误统计
       totalOb: Number(formData.totalOb) || 0,
+      totalGir: Number(formData.totalGir) || 0,
+      fairwaysHit: Number(formData.fairwaysHit) || 0,
       
-      // 🟡 回传字段：成绩分布（统一使用Number转换）
+      // ✅ 确保这四个字段都被正确转换为数字并发送
       doubleBogeys: Number(finalStats.doubleBogeys) || 0,  // 爆洞
-      bogeys: Number(finalStats.bogeys) || 0,              // 鸡洞
       pars: Number(finalStats.pars) || 0,                  // Par洞
       birdies: Number(finalStats.birdies) || 0,            // 鸟洞
+      bogeys: Number(finalStats.bogeys) || 0,              // 鸡洞
       eagles: Number(finalStats.eagles) || 0,              // 老鹰洞
       
-      // 🟡 回传字段：详细模式标记
-      isDetailed: inputMode === 'detailed',
-      
-      // 🟡 回传字段：每洞数据
-      holes: inputMode === 'detailed' ? holesData.map(h => ({
-        number: h.number,
-        par: Number(h.par) || 4,
-        score: Number(h.strokes) || 0,
-        putts: Number(h.putts) || 0,
-        ob: Number(h.ob) || 0,
-        fairwayHit: h.fairway,
-        gir: h.gir
-      })) : [],
-      
-      // 🟡 回传字段：天气和备注
       weather: (weather && weather.condition) ? weather : null,
-      notes: formData.notes || ''
+      holes: inputMode === 'detailed' ? holesData.map(h => ({
+        ...h,
+        strokes: Number(h.strokes) || 0,
+        putts: Number(h.putts) || 0,
+        ob: Number(h.ob) || 0
+      })) : []
     };
 
     console.log('最终提交的数据:', payload); // 调试用
@@ -409,9 +373,9 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
               </td>
             ))}
           </tr>
-          {/* 杆数 */}
+          {/* 总杆（原名"杆"） */}
           <tr>
-            <td className="p-2 font-bold bg-white border text-emerald-700">杆</td>
+            <td className="p-2 font-bold bg-white border text-emerald-700">总杆</td>
             {holesData.slice(start - 1, end).map((h, i) => (
               <td key={i} className="p-0 border">
                 <input 
@@ -453,27 +417,6 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
                 />
               </td>
             ))}
-          </tr>
-          {/* 总杆数（新增行，放在推杆和OB下面） */}
-          <tr>
-            <td className="p-2 font-bold bg-gray-50 border text-emerald-700">总杆</td>
-            {holesData.slice(start - 1, end).map((h, i) => {
-              const holeIndex = start - 1 + i;
-              const hole = holesData[holeIndex];
-              const strokes = parseInt(hole.strokes) || 0;
-              const putts = parseInt(hole.putts) || 0;
-              const ob = parseInt(hole.ob) || 0;
-              // 计算总杆数：杆数 + OB罚杆
-              const totalForHole = strokes + ob;
-              
-              return (
-                <td key={i} className="p-0 border">
-                  <div className="w-full h-8 text-center font-bold text-emerald-700 flex items-center justify-center">
-                    {totalForHole > 0 ? totalForHole : '-'}
-                  </div>
-                </td>
-              );
-            })}
           </tr>
           {/* GIR & FIR Checkboxes */}
           <tr>
@@ -649,7 +592,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
              {/* 1. 爆洞 (doubleBogeys) */}
              <div className="col-span-1">
-                <label className={labelClass} title="大于等于2倍标准杆">爆洞</label>
+                <label className={labelClass} title="大于等于标准杆2杆">爆洞</label>
                 <input 
                   type="number" 
                   name="doubleBogeys" 
