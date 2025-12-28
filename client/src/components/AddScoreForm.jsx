@@ -92,8 +92,9 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
         // 计算新增五个字段（与标准杆比较）
         if (s > 0) {
           const diff = s - par;
-          if (diff >= 2) {
-            doubleBogeysCount++; // 爆洞：大于等于标准杆2杆
+          // 爆洞：大于等于2倍标准杆
+          if (s >= 2 * par) {
+            doubleBogeysCount++;
           } else if (diff === 1) {
             bogeysCount++; // 鸡洞：大于标准杆1杆
           } else if (diff === 0) {
@@ -102,6 +103,9 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
             birdiesCount++; // 鸟洞：小于标准杆1杆
           } else if (diff <= -2) {
             eaglesCount++; // 老鹰洞：小于等于标准杆2杆
+          } else if (diff >= 2) {
+            // 处理 diff >= 2 但不是2倍标准杆的情况
+            // 可以根据需要归入其他分类，这里暂时不处理
           }
         }
       });
@@ -244,11 +248,18 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
           
           if (s > 0) {
             const diff = s - par;
-            if (diff >= 2) doubleBogeys++;
-            else if (diff === 1) bogeys++;
-            else if (diff === 0) pars++;
-            else if (diff === -1) birdies++;
-            else if (diff <= -2) eagles++;
+            // 爆洞：大于等于2倍标准杆
+            if (s >= 2 * par) {
+              doubleBogeys++;
+            } else if (diff === 1) {
+              bogeys++;
+            } else if (diff === 0) {
+              pars++;
+            } else if (diff === -1) {
+              birdies++;
+            } else if (diff <= -2) {
+              eagles++;
+            }
           }
         });
         
@@ -373,21 +384,6 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
               </td>
             ))}
           </tr>
-          {/* 总杆（原名"杆"） */}
-          <tr>
-            <td className="p-2 font-bold bg-white border text-emerald-700">总杆</td>
-            {holesData.slice(start - 1, end).map((h, i) => (
-              <td key={i} className="p-0 border">
-                <input 
-                  type="number" 
-                  value={h.strokes}
-                  placeholder="-"
-                  onChange={(e) => handleHoleChange(start - 1 + i, 'strokes', e.target.value)}
-                  className="w-full h-10 text-center font-bold text-lg outline-none focus:bg-emerald-50"
-                />
-              </td>
-            ))}
-          </tr>
           {/* 推杆 */}
           <tr>
             <td className="p-2 font-bold bg-gray-50 border text-gray-500">推</td>
@@ -414,6 +410,21 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
                   placeholder=""
                   onChange={(e) => handleHoleChange(start - 1 + i, 'ob', e.target.value)}
                   className="w-full h-8 text-center text-red-500 font-medium outline-none focus:bg-red-50"
+                />
+              </td>
+            ))}
+          </tr>
+          {/* 总杆（原名"杆"）- 调整到推杆和OB下面 */}
+          <tr>
+            <td className="p-2 font-bold bg-white border text-emerald-700">总杆</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-0 border">
+                <input 
+                  type="number" 
+                  value={h.strokes}
+                  placeholder="-"
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'strokes', e.target.value)}
+                  className="w-full h-10 text-center font-bold text-lg outline-none focus:bg-emerald-50"
                 />
               </td>
             ))}
@@ -592,7 +603,7 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
              {/* 1. 爆洞 (doubleBogeys) */}
              <div className="col-span-1">
-                <label className={labelClass} title="大于等于标准杆2杆">爆洞</label>
+                <label className={labelClass} title="大于等于2倍标准杆">爆洞</label>
                 <input 
                   type="number" 
                   name="doubleBogeys" 
