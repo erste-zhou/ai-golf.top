@@ -225,6 +225,34 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+    // 详细调试 - 插入这里
+  console.log('=== 详细调试开始 ===');
+  console.log('1. 当前formData:');
+  console.log('   doubleBogeys:', formData.doubleBogeys, '类型:', typeof formData.doubleBogeys);
+  console.log('   pars:', formData.pars, '类型:', typeof formData.pars);
+  console.log('   birdies:', formData.birdies, '类型:', typeof formData.birdies);
+  console.log('   bogeys:', formData.bogeys, '类型:', typeof formData.bogeys);
+  console.log('   eagles:', formData.eagles, '类型:', typeof formData.eagles);
+  
+  console.log('2. 前端统计区域显示的值:');
+  const statDisplay = {
+    doubleBogeys: document.querySelector('input[name="doubleBogeys"]')?.value,
+    pars: document.querySelector('input[name="pars"]')?.value,
+    birdies: document.querySelector('input[name="birdies"]')?.value,
+    bogeys: document.querySelector('input[name="bogeys"]')?.value,
+    eagles: document.querySelector('input[name="eagles"]')?.value
+  };
+  console.log('   显示的值:', statDisplay);
+  console.log('3. payload构建前:');
+  const testPayload = {
+    doubleBogeys: Number(formData.doubleBogeys) || 0,
+    pars: Number(formData.pars) || 0,
+    birdies: Number(formData.birdies) || 0,
+    bogeys: Number(formData.bogeys) || 0,
+    eagles: Number(formData.eagles) || 0
+  };
+  console.log('   转换后:', testPayload);
+  
     setIsSubmitting(true);
 
     const storedUser = JSON.parse(localStorage.getItem('user'));
