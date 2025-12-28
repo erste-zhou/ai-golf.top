@@ -293,12 +293,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       fairwaysHit: Number(formData.fairwaysHit) || 0,
       
       // ✅ 确保这四个字段都被正确转换为数字并发送
-      doubleBogeys: Number(finalStats.doubleBogeys) || 0,  // 爆洞
-      pars: Number(finalStats.pars) || 0,                  // Par洞
-      birdies: Number(finalStats.birdies) || 0,            // 鸟洞
-      bogeys: Number(finalStats.bogeys) || 0,              // 鸡洞
-      eagles: Number(finalStats.eagles) || 0,              // 老鹰洞
-      
+      doubleBogeys: Number(formData.doubleBogeys) || 0,  // 爆洞
+      pars: Number(formData.pars) || 0,                  // Par洞
+      birdies: Number(formData.birdies) || 0,            // 鸟洞
+      bogeys: Number(formData.bogeys) || 0,              // 鸡洞
+      eagles: Number(formData.eagles) || 0,              // 老鹰洞
+
       weather: (weather && weather.condition) ? weather : null,
       holes: inputMode === 'detailed' ? holesData.map(h => ({
         ...h,
