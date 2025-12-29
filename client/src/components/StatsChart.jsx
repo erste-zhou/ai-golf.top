@@ -595,7 +595,7 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
                           <div className={`text-lg font-bold ${score.doubleBogeys > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
                             {score.doubleBogeys || 0}
                           </div>
-                          <div className="text-[10px] text-gray-400">+2以上</div>
+                          <div className="text-[10px] text-gray-400">大于2Par</div>
                         </div>
                       </div>
                     </td>
