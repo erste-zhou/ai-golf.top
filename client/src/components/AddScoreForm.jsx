@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { pinyin } from 'pinyin-pro';
 import VoiceTextarea from './VoiceTextarea';
 
-const API_URL = 'https://ai-golf-tracker.onrender.com/add-score';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/add-score';
 
 // 初始化的18洞数据结构
 const initialHoles = Array.from({ length: 18 }, (_, i) => ({
@@ -321,11 +321,12 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
       fairwaysHit: Number(formData.fairwaysHit) || 0,
       
       // ✅ 确保这四个字段都被正确转换为数字并发送
-      doubleBogeys: Number(formData.doubleBogeys) || 0,  // 爆洞
-      pars: Number(formData.pars) || 0,                  // Par洞
-      birdies: Number(formData.birdies) || 0,            // 鸟洞
-      bogeys: Number(formData.bogeys) || 0,              // 鸡洞
-      eagles: Number(formData.eagles) || 0,              // 老鹰洞
+      // ✅ 使用 finalStats 中的值（详细模式自动计算，整场模式手动输入）
+      doubleBogeys: finalStats.doubleBogeys,
+      pars: finalStats.pars,
+      birdies: finalStats.birdies,
+      bogeys: finalStats.bogeys,
+      eagles: finalStats.eagles,
 
       weather: (weather && weather.condition) ? weather : null,
       holes: inputMode === 'detailed' ? holesData.map(h => ({
@@ -457,29 +458,33 @@ const AddScoreForm = ({ userEmail, onScoreAdded, onSuccess }) => {
               </td>
             ))}
           </tr>
-          {/* GIR & FIR Checkboxes */}
+          {/* Fairway (上球道) */}
           <tr>
-            <td className="p-1 font-bold bg-gray-50 border text-[10px]">G/F</td>
+            <td className="p-2 font-bold bg-white border text-blue-500 text-xs">F</td>
             {holesData.slice(start - 1, end).map((h, i) => (
-              <td key={i} className="p-1 border h-8 align-middle">
-                <div className="flex flex-col items-center gap-1">
-                   {/* GIR (标ON) */}
-                   <input 
-                      type="checkbox" 
-                      checked={h.gir} 
-                      onChange={(e) => handleHoleChange(start - 1 + i, 'gir', e.target.checked)} 
-                      title="GIR (标ON)" 
-                      className="accent-emerald-500 w-3 h-3 cursor-pointer" 
-                   />
-                   {/* Fairway (上球道) */}
-                   <input 
-                      type="checkbox" 
-                      checked={h.fairway} 
-                      onChange={(e) => handleHoleChange(start - 1 + i, 'fairway', e.target.checked)} 
-                      title="FIR (上球道)" 
-                      className="accent-blue-500 w-3 h-3 cursor-pointer" 
-                   />
-                </div>
+              <td key={i} className="p-1 border h-10 align-middle">
+                <input 
+                  type="checkbox" 
+                  checked={h.fairway} 
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'fairway', e.target.checked)} 
+                  title="FIR (上球道)" 
+                  className="accent-blue-500 w-4 h-4 cursor-pointer mx-auto block" 
+                />
+              </td>
+            ))}
+          </tr>
+          {/* GIR (标 ON) */}
+          <tr>
+            <td className="p-2 font-bold bg-white border text-emerald-500 text-xs">G</td>
+            {holesData.slice(start - 1, end).map((h, i) => (
+              <td key={i} className="p-1 border h-10 align-middle">
+                <input 
+                  type="checkbox" 
+                  checked={h.gir} 
+                  onChange={(e) => handleHoleChange(start - 1 + i, 'gir', e.target.checked)} 
+                  title="GIR (标 ON)" 
+                  className="accent-emerald-500 w-4 h-4 cursor-pointer mx-auto block" 
+                />
               </td>
             ))}
           </tr>

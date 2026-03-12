@@ -2,7 +2,10 @@
 
 **版本：** v1.0.0-stable  
 **日期：** 2026-03-12  
-**GitHub：** https://github.com/erste-zhou/ai-golf.top
+**GitHub：** https://github.com/erste-zhou/ai-golf.top  
+**域名：** ai-golf.top  
+**旧部署地址：** https://ai-golf-tracker.onrender.com（Render.com 免费部署）  
+**旧部署：** https://ai-golf-tracker.onrender.com
 
 ---
 
@@ -116,26 +119,40 @@ docker-compose up -d
 #### 后端 (server/.env)
 
 ```env
+# ⚠️ 重要：.env 文件不应该提交到 Git！
+# 确保 .env 在 .gitignore 中
+
 # 服务端口
 PORT=3000
 
-# 数据库连接
-MONGO_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/golf-tracker?retryWrites=true&w=majority
+# 数据库连接（示例 - 请使用自己的连接串）
+MONGO_URI=mongodb+srv://golfcoach:ibm00ibm@cluster0.omomlp0.mongodb.net/golf-tracker?retryWrites=true&w=majority&appName=Cluster0
 
-# JWT 密钥
-JWT_SECRET=your-secret-key-here
+# JWT 密钥（生成随机字符串）
+JWT_SECRET=your-random-secret-key-min-32-chars
 
 # AI 服务
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
 
 # 天气服务
-WEATHER_API_KEY=xxxxxxxxxxxxxxxx
+WEATHER_API_KEY=933a528d7e1147ed97744718251712
 
 # 邮件服务（可选，用于密码重置）
 EMAIL_HOST=smtp.139.com
 EMAIL_PORT=465
 EMAIL_USER=your-email@139.com
 EMAIL_PASS=your-auth-code
+```
+
+#### .gitignore 配置
+
+确保 `.env` 文件不被提交：
+
+```bash
+# .gitignore
+.env
+.env.local
+.env.production
 ```
 
 #### 前端 (client/.env)
@@ -177,10 +194,10 @@ git push origin main
 在 Render 控制台添加以下环境变量：
 
 ```
-MONGO_URI=你的 MongoDB 连接串
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
-WEATHER_API_KEY=你的 WeatherAPI Key
-JWT_SECRET=随机生成的密钥
+MONGO_URI=mongodb+srv://golfcoach:ibm00ibm@cluster0.omomlp0.mongodb.net/golf-tracker?retryWrites=true&w=majority&appName=Cluster0
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx  # 请填写你的 DeepSeek API Key
+WEATHER_API_KEY=933a528d7e1147ed97744718251712
+JWT_SECRET=随机生成的密钥（至少 32 字符）
 ```
 
 #### 4. 部署

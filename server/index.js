@@ -127,6 +127,8 @@ app.post('/add-score', async (req, res) => {
       holes, // 详细模式下的每洞数据
       frontNine, backNine, totalScore, 
       totalPutts, fairwaysHit, threePutts, totalGir, totalOb,
+      // 成绩分布字段
+      doubleBogeys, bogeys, pars, birdies, eagles,
       weather, notes 
     } = req.body;
 
@@ -151,7 +153,13 @@ app.post('/add-score', async (req, res) => {
       fairwaysHit: Number(fairwaysHit) || 0,
       threePutts: Number(threePutts) || 0,
       totalGir: Number(totalGir) || 0,
-      totalOb: Number(totalOb) || 0
+      totalOb: Number(totalOb) || 0,
+      // 成绩分布字段
+      doubleBogeys: Number(doubleBogeys) || 0,
+      bogeys: Number(bogeys) || 0,
+      pars: Number(pars) || 0,
+      birdies: Number(birdies) || 0,
+      eagles: Number(eagles) || 0
     };
 
     // 4. 保存到数据库

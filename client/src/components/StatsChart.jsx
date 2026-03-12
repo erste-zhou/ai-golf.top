@@ -56,7 +56,16 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
   }));
 
   // 按日期排序用于列表和AI分析 (新 -> 旧)
-  const sortedScoresDesc = [...scores].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedScoresDesc = [...scores].sort((a, b) => {
+    // 先按日期降序
+    const dateDiff = new Date(b.date) - new Date(a.date);
+    if (dateDiff !== 0) return dateDiff;
+    // 日期相同，按创建时间降序（后录入的在上）
+    if (a.createdAt && b.createdAt) {
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    }
+    return 0;
+  });
 
   // 天气图标映射
   const getWeatherIcon = (condition) => {
@@ -221,7 +230,8 @@ const StatsChart = ({ scores, onUpdate, onDelete }) => {
     };
 
     try {
-      const res = await fetch(`https://ai-golf-tracker.onrender.com/update-score/${editingScore._id}`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const res = await fetch(`${apiUrl}/update-score/${editingScore._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
