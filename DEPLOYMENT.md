@@ -203,7 +203,7 @@ git push origin main
 
 ```
 MONGO_URI=mongodb+srv://golfcoach:ibm00ibm@cluster0.omomlp0.mongodb.net/golf-tracker?retryWrites=true&w=majority&appName=Cluster0
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx  # 请填写你的 DeepSeek API Key
+DEEPSEEK_API_KEY=sk-35eb6fa57dff414d9597cdd91c77f250  # ✅ 已配置
 WEATHER_API_KEY=933a528d7e1147ed97744718251712
 JWT_SECRET=随机生成的密钥（至少 32 字符）
 ```
