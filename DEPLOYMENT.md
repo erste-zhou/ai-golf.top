@@ -157,13 +157,21 @@ EMAIL_PASS=your-auth-code
 
 #### 前端 (client/.env)
 
+**本地开发：** `client/.env`
 ```env
-# 天气 API（客户端需要）
-VITE_WEATHER_API_KEY=xxxxxxxxxxxxxxxx
+VITE_WEATHER_API_KEY=933a528d7e1147ed97744718251712
+VITE_API_URL=http://localhost:3000
+```
 
-# 后端 API 地址（部署时修改）
+**生产环境：** `client/.env.production`
+```env
+VITE_WEATHER_API_KEY=933a528d7e1147ed97744718251712
 VITE_API_URL=https://api.ai-golf.top
 ```
+
+**部署平台环境变量（Vercel/Railway/Render）：**
+- `VITE_WEATHER_API_KEY`: `933a528d7e1147ed97744718251712`
+- `VITE_API_URL`: `https://你的域名.com` 或 `https://xxx.onrender.com`
 
 ---
 
